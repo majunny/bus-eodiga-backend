@@ -20,6 +20,7 @@ google-services.json
 *.log
 drt_simulator/hardware/*.pt
 /26swbest2.pt
+/deliverables/
 cache/
 outputs/
 map.db
