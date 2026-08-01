@@ -75,6 +75,8 @@ def make_client(
         store_backend="memory",
         enable_demo_dispatch=True,
         demo_group_size=3,
+        hardware_vehicle_control_enabled=True,
+        vehicle_api_key="test-vehicle-key",
     )
     return TestClient(
         create_app(
@@ -350,6 +352,67 @@ def test_demo_assignment_counts_companions_toward_departure() -> None:
     assert refreshed_first.json()["status"] == "ASSIGNED"
     assert assigned.json()["matched_passenger_count"] == 3
     assert len(assigned.json()["demo_route_stops"]) == 4
+
+
+def test_hardware_vehicle_claims_trip_and_reports_progress() -> None:
+    """MODI 차량은 전용 키로 운행을 선점하고 승하차 상태를 갱신한다."""
+
+    client = make_client()
+    payload = request_payload()
+    payload["passenger_count"] = 3
+    user_headers = {
+        "Authorization": "Bearer test-token:modi-rider",
+        "Idempotency-Key": "request-key-modi-rider",
+    }
+    created = client.post("/v1/ride-requests", headers=user_headers, json=payload)
+    assigned = client.post(
+        f"/v1/ride-requests/{created.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:modi-rider"},
+    )
+    trip_id = assigned.json()["demo_trip_id"]
+    assert trip_id
+
+    unauthorized = client.get("/v1/vehicles/demo-bus-01/trips/next")
+    assert unauthorized.status_code == 401
+
+    vehicle_headers = {"X-Vehicle-Key": "test-vehicle-key"}
+    polled = client.get("/v1/vehicles/demo-bus-01/trips/next", headers=vehicle_headers)
+    assert polled.status_code == 200
+    assert polled.json()["trip"]["trip_id"] == trip_id
+    assert len(polled.json()["trip"]["route_steps"]) == 2
+
+    claimed = client.post(
+        f"/v1/vehicles/demo-bus-01/trips/{trip_id}/claim",
+        headers=vehicle_headers,
+    )
+    assert claimed.status_code == 200
+    assert claimed.json()["simulation_started"] is True
+    assert claimed.json()["phase"] == "RUNNING"
+
+    phases = [
+        (0, "EN_ROUTE"),
+        (0, "ARRIVED"),
+        (0, "BOARDED"),
+        (1, "EN_ROUTE"),
+        (1, "ARRIVED"),
+        (1, "DROPPED_OFF"),
+        (1, "COMPLETED"),
+    ]
+    for stop_index, phase in phases:
+        progress = client.post(
+            f"/v1/vehicles/demo-bus-01/trips/{trip_id}/progress",
+            headers=vehicle_headers,
+            json={"stop_index": stop_index, "phase": phase},
+        )
+        assert progress.status_code == 200
+        assert progress.json()["phase"] == phase
+
+    refreshed = client.get(
+        f"/v1/ride-requests/{created.json()['request_id']}",
+        headers={"Authorization": "Bearer test-token:modi-rider"},
+    )
+    assert refreshed.json()["status"] == "COMPLETED"
+    assert refreshed.json()["demo_trip_phase"] == "COMPLETED"
 
 
 def test_demo_simulation_picks_up_and_drops_off_every_rider() -> None:

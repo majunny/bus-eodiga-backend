@@ -25,6 +25,8 @@ services:
         value: "5"
       - key: DEMO_DWELL_SECONDS
         value: "2"
+      - key: HARDWARE_VEHICLE_CONTROL_ENABLED
+        value: "false"
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_CREDENTIALS_JSON

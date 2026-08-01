@@ -37,6 +37,14 @@ class RideRepository(ABC):
         """한 서버 작업만 운행 시뮬레이션을 시작하도록 선점한다."""
 
     @abstractmethod
+    def find_available_demo_trip(self, vehicle_id: str) -> Optional[dict]:
+        """차량이 아직 선점하지 않은 가장 오래된 운행을 반환한다."""
+
+    @abstractmethod
+    def get_demo_trip(self, trip_id: str) -> Optional[dict]:
+        """공동 운행 ID로 내부 차량 운행 문서를 조회한다."""
+
+    @abstractmethod
     def update_demo_trip_progress(
         self,
         trip_id: str,
@@ -137,6 +145,7 @@ class MemoryRideRepository(RideRepository):
                 })
             self._demo_trips[trip_id] = {
                 "trip_id": trip_id,
+                "vehicle_id": vehicle_id,
                 "request_ids": [item.request_id for item in waiting],
                 "route_steps": [
                     {**step, "place": step["place"].model_dump(mode="json")}
@@ -156,7 +165,23 @@ class MemoryRideRepository(RideRepository):
             if trip is None or trip.get("simulation_started"):
                 return None
             trip["simulation_started"] = True
+            trip["phase"] = "RUNNING"
             return dict(trip)
+
+    def find_available_demo_trip(self, vehicle_id: str) -> Optional[dict]:
+        """메모리 운행 중 해당 차량이 아직 선점하지 않은 첫 운행을 반환한다."""
+
+        with self._lock:
+            for trip in self._demo_trips.values():
+                if trip.get("vehicle_id") == vehicle_id and not trip.get("simulation_started"):
+                    return dict(trip)
+        return None
+
+    def get_demo_trip(self, trip_id: str) -> Optional[dict]:
+        """메모리에서 공동 운행을 조회한다."""
+
+        trip = self._demo_trips.get(trip_id)
+        return dict(trip) if trip is not None else None
 
     def update_demo_trip_progress(
         self,
@@ -368,9 +393,27 @@ class FirestoreRideRepository(RideRepository):
                 "phase": "RUNNING",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
-            return data
+            return {**data, "simulation_started": True, "phase": "RUNNING"}
 
         return claim(transaction)
+
+    def find_available_demo_trip(self, vehicle_id: str) -> Optional[dict]:
+        """Firestore에서 해당 차량의 미선점 운행을 생성 순서로 반환한다."""
+
+        candidates = []
+        for snapshot in self._demo_trips.where("vehicle_id", "==", vehicle_id).stream():
+            data = snapshot.to_dict()
+            if not data.get("simulation_started") and data.get("phase") != "COMPLETED":
+                candidates.append(data)
+        if not candidates:
+            return None
+        return min(candidates, key=lambda item: str(item.get("created_at") or ""))
+
+    def get_demo_trip(self, trip_id: str) -> Optional[dict]:
+        """Firestore에서 공동 운행 문서를 조회한다."""
+
+        snapshot = self._demo_trips.document(trip_id).get()
+        return snapshot.to_dict() if snapshot.exists else None
 
     def update_demo_trip_progress(
         self,

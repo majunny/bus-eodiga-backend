@@ -1,0 +1,153 @@
+{
+  "units": {
+    "coordinates": "cm",
+    "distance": "cm"
+  },
+  "board": {
+    "width_cm": 120.0,
+    "height_cm": 80.0,
+    "margin_cm": 8.0
+  },
+  "nodes": {
+    "stop_1": {
+      "name": "동부아파트입구",
+      "x": 94.202,
+      "y": 72.0,
+      "place_id": "31208",
+      "latitude": 35.52742029,
+      "longitude": 129.3225519
+    },
+    "stop_2": {
+      "name": "수암시장앞",
+      "x": 83.463,
+      "y": 68.35,
+      "place_id": "31205",
+      "latitude": 35.52792702,
+      "longitude": 129.3207326
+    },
+    "stop_3": {
+      "name": "공업탑",
+      "x": 18.778,
+      "y": 31.738,
+      "place_id": "40404",
+      "latitude": 35.53301001,
+      "longitude": 129.3097744
+    },
+    "stop_4": {
+      "name": "달동현대아파트앞",
+      "x": 101.222,
+      "y": 8.0,
+      "place_id": "40411",
+      "latitude": 35.53630572,
+      "longitude": 129.3237411
+    },
+    "stop_5": {
+      "name": "강남초등학교",
+      "x": 82.375,
+      "y": 11.5,
+      "place_id": "40410",
+      "latitude": 35.5358198,
+      "longitude": 129.3205483
+    },
+    "stop_6": {
+      "name": "롯데마트",
+      "x": 59.902,
+      "y": 26.865,
+      "place_id": "64201",
+      "latitude": 35.5336866,
+      "longitude": 129.3167411
+    }
+  },
+  "roads": [
+    {
+      "start": "stop_1",
+      "end": "stop_2",
+      "distance": 11.342,
+      "one_way": false
+    },
+    {
+      "start": "stop_1",
+      "end": "stop_3",
+      "distance": 85.497,
+      "one_way": false
+    },
+    {
+      "start": "stop_1",
+      "end": "stop_4",
+      "distance": 64.384,
+      "one_way": false
+    },
+    {
+      "start": "stop_1",
+      "end": "stop_5",
+      "distance": 61.645,
+      "one_way": false
+    },
+    {
+      "start": "stop_1",
+      "end": "stop_6",
+      "distance": 56.689,
+      "one_way": false
+    },
+    {
+      "start": "stop_2",
+      "end": "stop_3",
+      "distance": 74.328,
+      "one_way": false
+    },
+    {
+      "start": "stop_2",
+      "end": "stop_4",
+      "distance": 62.909,
+      "one_way": false
+    },
+    {
+      "start": "stop_2",
+      "end": "stop_5",
+      "distance": 56.86,
+      "one_way": false
+    },
+    {
+      "start": "stop_2",
+      "end": "stop_6",
+      "distance": 47.709,
+      "one_way": false
+    },
+    {
+      "start": "stop_3",
+      "end": "stop_4",
+      "distance": 85.793,
+      "one_way": false
+    },
+    {
+      "start": "stop_3",
+      "end": "stop_5",
+      "distance": 66.739,
+      "one_way": false
+    },
+    {
+      "start": "stop_3",
+      "end": "stop_6",
+      "distance": 41.412,
+      "one_way": false
+    },
+    {
+      "start": "stop_4",
+      "end": "stop_5",
+      "distance": 19.169,
+      "one_way": false
+    },
+    {
+      "start": "stop_4",
+      "end": "stop_6",
+      "distance": 45.423,
+      "one_way": false
+    },
+    {
+      "start": "stop_5",
+      "end": "stop_6",
+      "distance": 27.224,
+      "one_way": false
+    }
+  ]
+}

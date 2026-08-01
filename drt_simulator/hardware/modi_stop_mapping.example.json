@@ -1,0 +1,12 @@
+{
+  "start_node": "depot",
+  "place_to_node": {
+    "15415": "REPLACE_WITH_MINI_MAP_NODE",
+    "12318": "REPLACE_WITH_MINI_MAP_NODE",
+    "31109": "REPLACE_WITH_MINI_MAP_NODE",
+    "uh-hospital": "REPLACE_WITH_MINI_MAP_NODE",
+    "namgu-center": "REPLACE_WITH_MINI_MAP_NODE",
+    "sinjeong-market": "REPLACE_WITH_MINI_MAP_NODE"
+  },
+  "name_to_node": {}
+}

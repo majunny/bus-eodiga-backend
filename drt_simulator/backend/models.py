@@ -161,3 +161,36 @@ class PlaceSearchResponse(BaseModel):
     latitude: float = Field(ge=-90.0, le=90.0)
     longitude: float = Field(ge=-180.0, le=180.0)
     category: str = "PLACE"
+
+
+class VehicleRouteStep(BaseModel):
+    """MODI 차량이 수행할 한 번의 승차·하차 경유지입니다."""
+
+    request_id: str
+    type: Literal["PICKUP", "DROPOFF"]
+    order: int = Field(ge=1, le=6)
+    place: PlacePayload
+
+
+class VehicleTripResponse(BaseModel):
+    """차량 제어기가 조회하는 공동 DRT 운행 정보입니다."""
+
+    trip_id: str
+    vehicle_id: str
+    route_steps: List[VehicleRouteStep]
+    simulation_started: bool = False
+    phase: str = "READY"
+    current_stop_index: int = Field(default=-1, ge=-1, le=12)
+
+
+class VehicleTripPollResponse(BaseModel):
+    """대기 중인 운행이 없을 수도 있는 차량 폴링 응답입니다."""
+
+    trip: Optional[VehicleTripResponse] = None
+
+
+class VehicleProgressRequest(BaseModel):
+    """MODI 차량이 서버에 보고하는 경유지 진행 상태입니다."""
+
+    stop_index: int = Field(ge=0, le=12)
+    phase: Literal["EN_ROUTE", "ARRIVED", "BOARDED", "DROPPED_OFF", "COMPLETED"]

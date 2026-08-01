@@ -1,0 +1,242 @@
+[
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31208",
+    "pickup_name": "동부아파트입구",
+    "destination_place_id": "31205",
+    "destination_name": "수암시장앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31208",
+    "pickup_name": "동부아파트입구",
+    "destination_place_id": "40404",
+    "destination_name": "공업탑"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31208",
+    "pickup_name": "동부아파트입구",
+    "destination_place_id": "40411",
+    "destination_name": "달동현대아파트앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31208",
+    "pickup_name": "동부아파트입구",
+    "destination_place_id": "40410",
+    "destination_name": "강남초등학교"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31208",
+    "pickup_name": "동부아파트입구",
+    "destination_place_id": "64201",
+    "destination_name": "롯데마트"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31205",
+    "pickup_name": "수암시장앞",
+    "destination_place_id": "31208",
+    "destination_name": "동부아파트입구"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31205",
+    "pickup_name": "수암시장앞",
+    "destination_place_id": "40404",
+    "destination_name": "공업탑"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31205",
+    "pickup_name": "수암시장앞",
+    "destination_place_id": "40411",
+    "destination_name": "달동현대아파트앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31205",
+    "pickup_name": "수암시장앞",
+    "destination_place_id": "40410",
+    "destination_name": "강남초등학교"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "31205",
+    "pickup_name": "수암시장앞",
+    "destination_place_id": "64201",
+    "destination_name": "롯데마트"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40404",
+    "pickup_name": "공업탑",
+    "destination_place_id": "31208",
+    "destination_name": "동부아파트입구"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40404",
+    "pickup_name": "공업탑",
+    "destination_place_id": "31205",
+    "destination_name": "수암시장앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40404",
+    "pickup_name": "공업탑",
+    "destination_place_id": "40411",
+    "destination_name": "달동현대아파트앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40404",
+    "pickup_name": "공업탑",
+    "destination_place_id": "40410",
+    "destination_name": "강남초등학교"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40404",
+    "pickup_name": "공업탑",
+    "destination_place_id": "64201",
+    "destination_name": "롯데마트"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40411",
+    "pickup_name": "달동현대아파트앞",
+    "destination_place_id": "31208",
+    "destination_name": "동부아파트입구"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40411",
+    "pickup_name": "달동현대아파트앞",
+    "destination_place_id": "31205",
+    "destination_name": "수암시장앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40411",
+    "pickup_name": "달동현대아파트앞",
+    "destination_place_id": "40404",
+    "destination_name": "공업탑"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40411",
+    "pickup_name": "달동현대아파트앞",
+    "destination_place_id": "40410",
+    "destination_name": "강남초등학교"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40411",
+    "pickup_name": "달동현대아파트앞",
+    "destination_place_id": "64201",
+    "destination_name": "롯데마트"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40410",
+    "pickup_name": "강남초등학교",
+    "destination_place_id": "31208",
+    "destination_name": "동부아파트입구"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40410",
+    "pickup_name": "강남초등학교",
+    "destination_place_id": "31205",
+    "destination_name": "수암시장앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40410",
+    "pickup_name": "강남초등학교",
+    "destination_place_id": "40404",
+    "destination_name": "공업탑"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40410",
+    "pickup_name": "강남초등학교",
+    "destination_place_id": "40411",
+    "destination_name": "달동현대아파트앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "40410",
+    "pickup_name": "강남초등학교",
+    "destination_place_id": "64201",
+    "destination_name": "롯데마트"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "64201",
+    "pickup_name": "롯데마트",
+    "destination_place_id": "31208",
+    "destination_name": "동부아파트입구"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "64201",
+    "pickup_name": "롯데마트",
+    "destination_place_id": "31205",
+    "destination_name": "수암시장앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "64201",
+    "pickup_name": "롯데마트",
+    "destination_place_id": "40404",
+    "destination_name": "공업탑"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "64201",
+    "pickup_name": "롯데마트",
+    "destination_place_id": "40411",
+    "destination_name": "달동현대아파트앞"
+  },
+  {
+    "vehicle_start_place_id": "31208",
+    "vehicle_start_name": "동부아파트입구",
+    "pickup_place_id": "64201",
+    "pickup_name": "롯데마트",
+    "destination_place_id": "40410",
+    "destination_name": "강남초등학교"
+  }
+]
