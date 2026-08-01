@@ -18,6 +18,8 @@ class BackendSettings(BaseSettings):
     allow_dev_auth: bool = False
     dev_auth_token: str = "local-demo-token"
     cors_origins: List[str] = Field(default_factory=list)
+    osrm_base_url: str = "https://router.project-osrm.org"
+    routing_timeout_seconds: float = Field(default=20.0, gt=0.0, le=60.0)
 
     model_config = SettingsConfigDict(
         env_file=".env",

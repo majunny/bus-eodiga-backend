@@ -9,13 +9,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.auth import AuthenticatedUser, get_current_user
 from backend.config import BackendSettings, get_settings
 from backend.firebase import initialize_firestore
-from backend.models import HealthResponse, RideRequestCreate, RideRequestRecord
+from backend.models import (
+    FindNearestRouteRequest,
+    FindNearestRouteResponse,
+    HealthResponse,
+    RideRequestCreate,
+    RideRequestRecord,
+)
 from backend.repository import FirestoreRideRepository, MemoryRideRepository, RideRepository
+from backend.routing import OsrmRoutingService, RoutingService, RoutingServiceError
 
 
 def create_app(
     settings: Optional[BackendSettings] = None,
     repository: Optional[RideRepository] = None,
+    routing_service: Optional[RoutingService] = None,
 ) -> FastAPI:
     """설정과 저장소를 주입할 수 있는 FastAPI 앱을 생성한다."""
 
@@ -29,6 +37,10 @@ def create_app(
     application = FastAPI(title=active_settings.app_name, version="0.1.0")
     application.state.settings = active_settings
     application.state.ride_repository = repository
+    application.state.routing_service = routing_service or OsrmRoutingService(
+        base_url=active_settings.osrm_base_url,
+        timeout_seconds=active_settings.routing_timeout_seconds,
+    )
 
     if active_settings.cors_origins:
         application.add_middleware(
@@ -45,6 +57,19 @@ def create_app(
 
         current: BackendSettings = request.app.state.settings
         return HealthResponse(status="ok", environment=current.environment, store_backend=current.store_backend)
+
+    @application.post("/api/find_nearest", response_model=FindNearestRouteResponse)
+    def find_nearest_route(
+        payload: FindNearestRouteRequest,
+        request: Request,
+    ) -> FindNearestRouteResponse:
+        """Android에 가장 가까운 목적지까지의 OSM 도로 경로를 반환한다."""
+
+        service: RoutingService = request.app.state.routing_service
+        try:
+            return service.find_nearest(payload)
+        except RoutingServiceError as error:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
 
     @application.post(
         "/v1/ride-requests",

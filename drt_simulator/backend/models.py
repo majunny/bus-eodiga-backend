@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -104,3 +104,30 @@ class HealthResponse(BaseModel):
     status: str
     environment: str
     store_backend: str
+
+
+class RoutePlace(BaseModel):
+    """경로 후보 장소의 이름과 WGS84 좌표."""
+
+    name: str = Field(min_length=1, max_length=100)
+    lat: float = Field(ge=-90.0, le=90.0)
+    lon: float = Field(ge=-180.0, le=180.0)
+
+
+class FindNearestRouteRequest(BaseModel):
+    """Android 경로 미리보기 요청."""
+
+    start_lat: float = Field(ge=-90.0, le=90.0)
+    start_lon: float = Field(ge=-180.0, le=180.0)
+    hospitals: List[RoutePlace] = Field(min_length=1, max_length=10)
+    network_type: Literal["drive"] = "drive"
+    buffer_m: int = Field(default=1200, ge=100, le=10_000)
+
+
+class FindNearestRouteResponse(BaseModel):
+    """가장 가까운 목적지까지의 OSM 도로 경로."""
+
+    nearest_hospital: RoutePlace
+    distance_m: float = Field(ge=0.0)
+    map_url: str
+    route_coords: List[List[float]]

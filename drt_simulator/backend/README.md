@@ -1,6 +1,6 @@
 # BUS어디가 백엔드
 
-Kotlin 앱의 호출을 받고 Firebase Authentication 토큰을 검증한 뒤 Firestore에 저장하는 Render용 FastAPI 서버입니다. 현재는 호출 생성·조회·취소 API와 메모리/Firestore 저장소가 구현되어 있습니다. 실제 OSM 경로 및 배차 서비스는 `RideRepository`와 분리해서 다음 단계에 연결합니다.
+Kotlin 앱의 호출을 받고 Firebase Authentication 토큰을 검증한 뒤 Firestore에 저장하는 Render용 FastAPI 서버입니다. 호출 생성·조회·취소 API와 메모리/Firestore 저장소, OSRM을 이용한 OpenStreetMap 도로 경로 미리보기가 구현되어 있습니다. 실제 배차 서비스는 `RideRepository`와 분리해서 다음 단계에 연결합니다.
 
 ## 로컬 실행
 
@@ -21,6 +21,26 @@ uvicorn backend.main:app --reload
 
 - 상태: `http://127.0.0.1:8000/health`
 - API 문서: `http://127.0.0.1:8000/docs`
+
+## OSM 경로 예제
+
+`/api/find_nearest`는 Android 경로 미리보기에서 인증 없이 호출하며, 후보 중 도로 거리가 가장 짧은 목적지와 `[위도, 경도]` 순서의 경로 좌표를 반환합니다.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/find_nearest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_lat": 35.5514,
+    "start_lon": 129.1387,
+    "hospitals": [
+      {"name": "울산대학교병원", "lat": 35.5202, "lon": 129.4284}
+    ],
+    "network_type": "drive",
+    "buffer_m": 1200
+  }'
+```
+
+기본 라우팅 서버는 `https://router.project-osrm.org`이며 `OSRM_BASE_URL` 환경변수로 자체 OSRM 서버를 지정할 수 있습니다. `ROUTING_TIMEOUT_SECONDS`로 외부 요청 제한 시간을 설정합니다.
 
 ## 호출 예제
 
@@ -54,6 +74,7 @@ curl -X POST http://127.0.0.1:8000/v1/ride-requests \
 - `FIREBASE_CREDENTIALS_JSON`: Firebase 서비스 계정 JSON 전체 내용(Secret)
 - `STORE_BACKEND=firestore`
 - `ALLOW_DEV_AUTH=false`
+- `OSRM_BASE_URL=https://router.project-osrm.org` (선택)
 
 Build Command와 Start Command는 `render.yaml`에 정의되어 있습니다. Health Check Path는 `/health`입니다.
 
