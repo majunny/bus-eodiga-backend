@@ -81,7 +81,8 @@ class RideRequestRecord(RideRequestCreate):
     status: RideStatus
     assigned_vehicle_id: Optional[str] = None
     demo_trip_id: Optional[str] = None
-    matched_passenger_count: int = Field(default=0, ge=0, le=6)
+    # 여러 호출의 동반 인원까지 합산하므로 호출당 최대 인원(6)보다 커질 수 있다.
+    matched_passenger_count: int = Field(default=0, ge=0, le=36)
     demo_group_size: int = Field(default=3, ge=2, le=6)
     demo_route_stops: List[PlacePayload] = Field(default_factory=list)
     demo_current_stop_index: int = Field(default=-1, ge=-1, le=12)

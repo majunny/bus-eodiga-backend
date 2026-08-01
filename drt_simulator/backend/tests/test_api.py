@@ -302,6 +302,56 @@ def test_demo_assignment_waits_for_configured_group_and_assigns_shared_trip() ->
     assert len(assigned.json()["demo_route_stops"]) == 6
 
 
+def test_demo_assignment_counts_companions_toward_departure() -> None:
+    """본인과 동반 인원의 합계가 기준에 도달하면 호출 수와 무관하게 출발한다."""
+
+    client = make_client()
+    first_payload = request_payload()
+    first_payload["passenger_count"] = 2
+    first = client.post(
+        "/v1/ride-requests",
+        headers={
+            "Authorization": "Bearer test-token:family-one",
+            "Idempotency-Key": "request-key-family-one",
+        },
+        json=first_payload,
+    )
+    first_waiting = client.post(
+        f"/v1/ride-requests/{first.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:family-one"},
+    )
+    assert first_waiting.json()["status"] == "WAITING"
+    assert first_waiting.json()["matched_passenger_count"] == 2
+
+    second_payload = request_payload()
+    second_payload["pickup"] = {
+        "place_id": "city-hall-stop",
+        "name": "시청앞",
+        "location": {"latitude": 35.53915699, "longitude": 129.3123405},
+    }
+    second = client.post(
+        "/v1/ride-requests",
+        headers={
+            "Authorization": "Bearer test-token:solo-rider",
+            "Idempotency-Key": "request-key-solo-rider",
+        },
+        json=second_payload,
+    )
+    assigned = client.post(
+        f"/v1/ride-requests/{second.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:solo-rider"},
+    )
+    refreshed_first = client.get(
+        f"/v1/ride-requests/{first.json()['request_id']}",
+        headers={"Authorization": "Bearer test-token:family-one"},
+    )
+
+    assert assigned.json()["status"] == "ASSIGNED"
+    assert refreshed_first.json()["status"] == "ASSIGNED"
+    assert assigned.json()["matched_passenger_count"] == 3
+    assert len(assigned.json()["demo_route_stops"]) == 4
+
+
 def test_demo_simulation_picks_up_and_drops_off_every_rider() -> None:
     """자동 운행은 모든 P 지점에서 탑승시키고 모든 D 지점에서 완료한다."""
 

@@ -90,13 +90,13 @@ class MemoryRideRepository(RideRepository):
     def join_demo_pool(
         self, request_id: str, user_id: str, vehicle_id: str, group_size: int,
     ) -> Optional[RideRequestRecord]:
-        """최대 6명의 대기 상태를 갱신하고 정원이 차면 공동 배차한다."""
+        """본인과 동반 인원을 합산해 출발 기준을 충족하면 공동 배차한다."""
 
         with self._lock:
             record = self._records.get(request_id)
             if record is None or record.user_id != user_id:
                 return None
-            if record.status != RideStatus.WAITING or record.matched_passenger_count >= group_size:
+            if record.status != RideStatus.WAITING:
                 return record
             waiting = [
                 self._records[waiting_id]
@@ -110,13 +110,14 @@ class MemoryRideRepository(RideRepository):
             waiting.append(record)
             self._demo_waiting_ids = [item.request_id for item in waiting]
             now = datetime.now(timezone.utc)
+            matched_passenger_count = sum(item.passenger_count for item in waiting)
             for participant in waiting:
                 self._records[participant.request_id] = participant.model_copy(update={
-                    "matched_passenger_count": len(waiting),
+                    "matched_passenger_count": matched_passenger_count,
                     "demo_group_size": group_size,
                     "updated_at": now,
                 })
-            if len(waiting) < group_size:
+            if matched_passenger_count < group_size:
                 return self._records[request_id]
 
             trip_id = str(uuid4())
@@ -127,7 +128,7 @@ class MemoryRideRepository(RideRepository):
                     "status": RideStatus.ASSIGNED,
                     "assigned_vehicle_id": vehicle_id,
                     "demo_trip_id": trip_id,
-                    "matched_passenger_count": group_size,
+                    "matched_passenger_count": matched_passenger_count,
                     "demo_group_size": group_size,
                     "demo_route_stops": route_stops,
                     "demo_current_stop_index": -1,
@@ -266,7 +267,7 @@ class FirestoreRideRepository(RideRepository):
             data = snapshot.to_dict()
             if data.get("user_id") != user_id:
                 return False
-            if data.get("status") != RideStatus.WAITING.value or data.get("matched_passenger_count") == group_size:
+            if data.get("status") != RideStatus.WAITING.value:
                 return True
 
             queue_snapshot = self._demo_queue.get(transaction=current)
@@ -292,9 +293,10 @@ class FirestoreRideRepository(RideRepository):
                 return True
             participants.append((document, RideRequestRecord.model_validate(data)))
             now = datetime.now(timezone.utc).isoformat()
-            if len(participants) < group_size:
+            matched_passenger_count = sum(participant.passenger_count for _, participant in participants)
+            if matched_passenger_count < group_size:
                 waiting_update = {
-                    "matched_passenger_count": len(participants),
+                    "matched_passenger_count": matched_passenger_count,
                     "demo_group_size": group_size,
                     "updated_at": now,
                 }
@@ -308,7 +310,7 @@ class FirestoreRideRepository(RideRepository):
                 })
                 return True
 
-            records = [participant for _, participant in participants[:group_size]]
+            records = [participant for _, participant in participants]
             route_plan = _build_demo_route_plan(records)
             route_stops = [step["place"].model_dump(mode="json") for step in route_plan]
             trip_id = str(uuid4())
@@ -316,14 +318,14 @@ class FirestoreRideRepository(RideRepository):
                 "status": RideStatus.ASSIGNED.value,
                 "assigned_vehicle_id": vehicle_id,
                 "demo_trip_id": trip_id,
-                "matched_passenger_count": group_size,
+                "matched_passenger_count": matched_passenger_count,
                 "demo_group_size": group_size,
                 "demo_route_stops": route_stops,
                 "demo_current_stop_index": -1,
                 "demo_trip_phase": "READY",
                 "updated_at": now,
             }
-            for participant_ref, _ in participants[:group_size]:
+            for participant_ref, _ in participants:
                 current.update(participant_ref, shared_update)
             current.set(self._demo_trips.document(trip_id), {
                 "trip_id": trip_id,
