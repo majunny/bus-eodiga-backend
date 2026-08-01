@@ -32,6 +32,10 @@ def get_current_user(
     token = credentials.credentials
     if settings.allow_dev_auth and token == settings.dev_auth_token:
         return AuthenticatedUser(uid="local-demo-user")
+    if settings.allow_dev_auth and token.startswith(f"{settings.dev_auth_token}:"):
+        uid = token.removeprefix(f"{settings.dev_auth_token}:").strip()
+        if uid:
+            return AuthenticatedUser(uid=uid)
 
     try:
         decoded = auth.verify_id_token(token)

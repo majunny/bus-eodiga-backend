@@ -156,7 +156,7 @@ def create_app(
         if not current.enable_demo_dispatch:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo dispatch is disabled")
         store: RideRepository = request.app.state.ride_repository
-        record = store.assign_demo(request_id, user.uid, "demo-bus-01")
+        record = store.join_demo_pool(request_id, user.uid, "demo-bus-01")
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")
         return record

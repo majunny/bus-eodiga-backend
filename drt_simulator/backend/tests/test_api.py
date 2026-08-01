@@ -172,22 +172,48 @@ def test_idempotent_create_and_cancel() -> None:
     assert cancelled.json()["status"] == "CANCELLED"
 
 
-def test_demo_assignment_updates_waiting_request() -> None:
-    """시연 배차는 실제 저장소 상태와 차량 ID를 갱신한다."""
+def test_demo_assignment_waits_for_two_users_and_assigns_shared_trip() -> None:
+    """첫 승객은 대기하고 두 번째 사용자가 합류하면 같은 운행에 배정한다."""
 
     client = make_client()
-    headers = {
-        "Authorization": "Bearer test-token",
-        "Idempotency-Key": "request-key-demo-assign",
+    first_headers = {
+        "Authorization": "Bearer test-token:phone-one",
+        "Idempotency-Key": "request-key-demo-phone-one",
     }
-    created = client.post("/v1/ride-requests", headers=headers, json=request_payload())
-    request_id = created.json()["request_id"]
+    second_headers = {
+        "Authorization": "Bearer test-token:phone-two",
+        "Idempotency-Key": "request-key-demo-phone-two",
+    }
+    first = client.post("/v1/ride-requests", headers=first_headers, json=request_payload())
+    second_payload = request_payload()
+    second_payload["pickup"] = {
+        "place_id": "taehwagang-station",
+        "name": "태화강역(종점)",
+        "location": {"latitude": 35.53843654, "longitude": 129.3528277},
+    }
+    second = client.post("/v1/ride-requests", headers=second_headers, json=second_payload)
+
+    waiting = client.post(
+        "/v1/ride-requests/{}/demo-assign".format(first.json()["request_id"]),
+        headers={"Authorization": "Bearer test-token:phone-one"},
+    )
+    assert waiting.status_code == 200
+    assert waiting.json()["status"] == "WAITING"
+    assert waiting.json()["matched_passenger_count"] == 1
 
     assigned = client.post(
-        "/v1/ride-requests/{}/demo-assign".format(request_id),
-        headers={"Authorization": "Bearer test-token"},
+        "/v1/ride-requests/{}/demo-assign".format(second.json()["request_id"]),
+        headers={"Authorization": "Bearer test-token:phone-two"},
+    )
+    refreshed_first = client.get(
+        "/v1/ride-requests/{}".format(first.json()["request_id"]),
+        headers={"Authorization": "Bearer test-token:phone-one"},
     )
 
     assert assigned.status_code == 200
     assert assigned.json()["status"] == "ASSIGNED"
+    assert refreshed_first.json()["status"] == "ASSIGNED"
     assert assigned.json()["assigned_vehicle_id"] == "demo-bus-01"
+    assert assigned.json()["demo_trip_id"] == refreshed_first.json()["demo_trip_id"]
+    assert assigned.json()["matched_passenger_count"] == 2
+    assert len(assigned.json()["demo_route_stops"]) == 4

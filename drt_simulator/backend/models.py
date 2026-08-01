@@ -80,6 +80,9 @@ class RideRequestRecord(RideRequestCreate):
     user_id: str
     status: RideStatus
     assigned_vehicle_id: Optional[str] = None
+    demo_trip_id: Optional[str] = None
+    matched_passenger_count: int = Field(default=0, ge=0, le=2)
+    demo_route_stops: List[PlacePayload] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
