@@ -1,0 +1,76 @@
+# BUS어디가 백엔드
+
+Kotlin 앱의 호출을 받고 Firebase Authentication 토큰을 검증한 뒤 Firestore에 저장하는 Render용 FastAPI 서버입니다. 현재는 호출 생성·조회·취소 API와 메모리/Firestore 저장소가 구현되어 있습니다. 실제 OSM 경로 및 배차 서비스는 `RideRepository`와 분리해서 다음 단계에 연결합니다.
+
+## 로컬 실행
+
+백엔드는 Firebase Admin SDK 지원 기간을 고려해 Python 3.11 이상을 권장합니다.
+
+```bash
+cd drt_simulator
+python3.11 -m venv .venv-backend
+source .venv-backend/bin/activate
+pip install -r backend/requirements.txt
+cp backend/.env.example .env
+uvicorn backend.main:app --reload
+```
+
+개발 모드에서는 `.env`의 `ALLOW_DEV_AUTH=true`와 `DEV_AUTH_TOKEN`을 사용합니다. 운영 환경에서는 반드시 `ALLOW_DEV_AUTH=false`여야 합니다.
+
+확인 주소:
+
+- 상태: `http://127.0.0.1:8000/health`
+- API 문서: `http://127.0.0.1:8000/docs`
+
+## 호출 예제
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ride-requests \
+  -H "Authorization: Bearer replace-this-local-token" \
+  -H "Idempotency-Key: demo-request-0001" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "ANDROID_APP",
+    "pickup": {
+      "place_id": "ulsan-station",
+      "name": "울산역",
+      "location": {"latitude": 35.5514, "longitude": 129.1387}
+    },
+    "destination": {
+      "place_id": "uh-hospital",
+      "name": "울산대학교병원",
+      "location": {"latitude": 35.5202, "longitude": 129.4284}
+    },
+    "passenger_count": 1,
+    "mobility_support": "SENIOR"
+  }'
+```
+
+## Render 설정
+
+저장소 루트의 `render.yaml`을 Blueprint로 불러옵니다. Render 환경변수에는 다음 값을 넣습니다.
+
+- `FIREBASE_PROJECT_ID`: Firebase 프로젝트 ID
+- `FIREBASE_CREDENTIALS_JSON`: Firebase 서비스 계정 JSON 전체 내용(Secret)
+- `STORE_BACKEND=firestore`
+- `ALLOW_DEV_AUTH=false`
+
+Build Command와 Start Command는 `render.yaml`에 정의되어 있습니다. Health Check Path는 `/health`입니다.
+
+서비스 계정 JSON 파일은 저장소에 올리지 않습니다. Render Secret 환경변수로만 보관합니다.
+
+## 인증 흐름
+
+1. Android가 Firebase Authentication으로 로그인합니다.
+2. Android가 현재 사용자의 Firebase ID Token을 가져옵니다.
+3. `Authorization: Bearer <ID_TOKEN>`으로 Render API를 호출합니다.
+4. 서버가 Firebase Admin SDK로 토큰을 검증하고 UID를 읽습니다.
+5. 서버가 해당 UID를 `ride_requests.user_id`로 저장합니다.
+6. Android는 본인 호출 문서만 Firestore Snapshot Listener로 읽습니다.
+
+## 테스트
+
+```bash
+cd drt_simulator
+python -m pytest backend/tests -q
+```

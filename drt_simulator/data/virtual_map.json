@@ -1,0 +1,344 @@
+{
+  "units": {
+    "distance": "km",
+    "time": "minutes"
+  },
+  "nodes": [
+    {
+      "node_id": "depot",
+      "name": "차고지",
+      "x": 0.5,
+      "y": 1.0,
+      "node_type": "DEPOT",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "stop_a",
+      "name": "스마트 정류장 A",
+      "x": 2.0,
+      "y": 2.0,
+      "node_type": "SMART_STOP",
+      "passenger_demand_weight": 1.2
+    },
+    {
+      "node_id": "stop_b",
+      "name": "스마트 정류장 B",
+      "x": 8.0,
+      "y": 2.0,
+      "node_type": "SMART_STOP",
+      "passenger_demand_weight": 1.0
+    },
+    {
+      "node_id": "hospital",
+      "name": "병원",
+      "x": 8.5,
+      "y": 7.5,
+      "node_type": "DESTINATION",
+      "passenger_demand_weight": 1.8
+    },
+    {
+      "node_id": "market",
+      "name": "시장",
+      "x": 5.5,
+      "y": 5.0,
+      "node_type": "DESTINATION",
+      "passenger_demand_weight": 1.0
+    },
+    {
+      "node_id": "welfare_center",
+      "name": "복지관",
+      "x": 2.0,
+      "y": 7.5,
+      "node_type": "DESTINATION",
+      "passenger_demand_weight": 1.5
+    },
+    {
+      "node_id": "community_center",
+      "name": "행정복지센터",
+      "x": 5.0,
+      "y": 8.7,
+      "node_type": "DESTINATION",
+      "passenger_demand_weight": 0.7
+    },
+    {
+      "node_id": "j1",
+      "name": "교차로 1",
+      "x": 1.5,
+      "y": 1.0,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j2",
+      "name": "교차로 2",
+      "x": 3.3,
+      "y": 2.0,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j3",
+      "name": "교차로 3",
+      "x": 5.2,
+      "y": 2.0,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j4",
+      "name": "교차로 4",
+      "x": 7.0,
+      "y": 2.0,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j5",
+      "name": "교차로 5",
+      "x": 3.3,
+      "y": 4.5,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j6",
+      "name": "교차로 6",
+      "x": 7.0,
+      "y": 4.5,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j7",
+      "name": "교차로 7",
+      "x": 3.3,
+      "y": 7.0,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j8",
+      "name": "교차로 8",
+      "x": 7.0,
+      "y": 7.0,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j9",
+      "name": "교차로 9",
+      "x": 5.2,
+      "y": 7.0,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    },
+    {
+      "node_id": "j10",
+      "name": "교차로 10",
+      "x": 5.2,
+      "y": 4.5,
+      "node_type": "INTERSECTION",
+      "passenger_demand_weight": 0.0
+    }
+  ],
+  "roads": [
+    {
+      "start": "depot",
+      "end": "j1",
+      "distance_km": 0.8,
+      "speed_limit_kmh": 25,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j1",
+      "end": "stop_a",
+      "distance_km": 0.9,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.1,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "stop_a",
+      "end": "j2",
+      "distance_km": 1.0,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.2,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j2",
+      "end": "j3",
+      "distance_km": 1.4,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j3",
+      "end": "j4",
+      "distance_km": 1.3,
+      "speed_limit_kmh": 25,
+      "congestion_factor": 1.1,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j4",
+      "end": "stop_b",
+      "distance_km": 0.8,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.2,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j2",
+      "end": "j5",
+      "distance_km": 1.7,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j5",
+      "end": "j7",
+      "distance_km": 1.8,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.1,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j7",
+      "end": "welfare_center",
+      "distance_km": 1.0,
+      "speed_limit_kmh": 25,
+      "congestion_factor": 1.2,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j7",
+      "end": "j9",
+      "distance_km": 1.4,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j9",
+      "end": "community_center",
+      "distance_km": 1.2,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.1,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j9",
+      "end": "j8",
+      "distance_km": 1.3,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.2,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j8",
+      "end": "hospital",
+      "distance_km": 1.0,
+      "speed_limit_kmh": 25,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "stop_b",
+      "end": "j6",
+      "distance_km": 1.7,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.1,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j6",
+      "end": "j8",
+      "distance_km": 1.8,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.2,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j5",
+      "end": "j10",
+      "distance_km": 1.3,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j10",
+      "end": "j6",
+      "distance_km": 1.3,
+      "speed_limit_kmh": 25,
+      "congestion_factor": 1.1,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j10",
+      "end": "market",
+      "distance_km": 0.7,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.2,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j3",
+      "end": "j10",
+      "distance_km": 1.7,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "market",
+      "end": "j9",
+      "distance_km": 1.5,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.1,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j1",
+      "end": "j5",
+      "distance_km": 2.3,
+      "speed_limit_kmh": 25,
+      "congestion_factor": 1.2,
+      "one_way": false,
+      "is_open": true
+    },
+    {
+      "start": "j6",
+      "end": "hospital",
+      "distance_km": 2.1,
+      "speed_limit_kmh": 35,
+      "congestion_factor": 1.0,
+      "one_way": false,
+      "is_open": true
+    }
+  ]
+}

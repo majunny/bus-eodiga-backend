@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.testvenv/
+data/simulation_results/*.csv
+data/simulation_results/*.png
+

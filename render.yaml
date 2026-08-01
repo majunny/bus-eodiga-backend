@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: bus-eodiga-api
+    runtime: python
+    rootDir: drt_simulator
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: ENVIRONMENT
+        value: production
+      - key: STORE_BACKEND
+        value: firestore
+      - key: ALLOW_DEV_AUTH
+        value: "false"
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
