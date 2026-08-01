@@ -1,5 +1,7 @@
 """호출 API의 인증·중복·소유권·상태 테스트."""
 
+from datetime import timedelta
+
 from fastapi.testclient import TestClient
 
 from backend.config import BackendSettings
@@ -438,6 +440,56 @@ def test_demo_assignment_counts_companions_toward_departure() -> None:
     assert refreshed_first.json()["status"] == "ASSIGNED"
     assert assigned.json()["matched_passenger_count"] == 3
     assert len(assigned.json()["demo_route_stops"]) == 4
+
+
+def test_expired_demo_waiter_does_not_start_a_new_trip() -> None:
+    """오래된 시연 호출은 새 승객의 출발 인원에 포함하지 않는다."""
+
+    repository = MemoryRideRepository()
+    client = TestClient(
+        create_app(
+            settings=BackendSettings(
+                allow_dev_auth=True,
+                dev_auth_token="test-token",
+                store_backend="memory",
+                enable_demo_dispatch=True,
+                demo_group_size=3,
+                demo_queue_ttl_seconds=180,
+            ),
+            repository=repository,
+            routing_service=StubRoutingService(),
+            place_search_service=StubPlaceSearchService(),
+        )
+    )
+    old_payload = request_payload()
+    old_payload["passenger_count"] = 2
+    old = client.post(
+        "/v1/ride-requests",
+        headers={"Authorization": "Bearer test-token:old", "Idempotency-Key": "old-waiter"},
+        json=old_payload,
+    )
+    client.post(
+        f"/v1/ride-requests/{old.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:old"},
+    )
+    old_record = repository._records[old.json()["request_id"]]
+    repository._records[old_record.request_id] = old_record.model_copy(
+        update={"updated_at": old_record.updated_at - timedelta(seconds=181)}
+    )
+
+    fresh = client.post(
+        "/v1/ride-requests",
+        headers={"Authorization": "Bearer test-token:fresh", "Idempotency-Key": "fresh-waiter"},
+        json=request_payload(),
+    )
+    joined = client.post(
+        f"/v1/ride-requests/{fresh.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:fresh"},
+    )
+
+    assert joined.json()["status"] == "WAITING"
+    assert joined.json()["matched_passenger_count"] == 1
+    assert joined.json()["demo_trip_id"] is None
 
 
 def test_hardware_vehicle_claims_trip_and_reports_progress() -> None:

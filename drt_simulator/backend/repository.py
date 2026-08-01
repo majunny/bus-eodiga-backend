@@ -28,7 +28,12 @@ class RideRepository(ABC):
 
     @abstractmethod
     def join_demo_pool(
-        self, request_id: str, user_id: str, vehicle_id: str, group_size: int,
+        self,
+        request_id: str,
+        user_id: str,
+        vehicle_id: str,
+        group_size: int,
+        queue_ttl_seconds: float = 180.0,
     ) -> Optional[RideRequestRecord]:
         """설정된 인원의 시연 승객이 모이면 함께 배정한다."""
 
@@ -96,7 +101,12 @@ class MemoryRideRepository(RideRepository):
             return updated
 
     def join_demo_pool(
-        self, request_id: str, user_id: str, vehicle_id: str, group_size: int,
+        self,
+        request_id: str,
+        user_id: str,
+        vehicle_id: str,
+        group_size: int,
+        queue_ttl_seconds: float = 180.0,
     ) -> Optional[RideRequestRecord]:
         """본인과 동반 인원을 합산해 출발 기준을 충족하면 공동 배차한다."""
 
@@ -106,11 +116,14 @@ class MemoryRideRepository(RideRepository):
                 return None
             if record.status != RideStatus.WAITING:
                 return record
+            now = datetime.now(timezone.utc)
             waiting_ids = self._demo_waiting_ids.get(vehicle_id, [])
             waiting = [
                 self._records[waiting_id]
                 for waiting_id in waiting_ids
-                if waiting_id in self._records and self._records[waiting_id].status == RideStatus.WAITING
+                if waiting_id in self._records
+                and self._records[waiting_id].status == RideStatus.WAITING
+                and (now - self._records[waiting_id].updated_at).total_seconds() <= queue_ttl_seconds
             ]
             if request_id in {item.request_id for item in waiting}:
                 return record
@@ -118,7 +131,6 @@ class MemoryRideRepository(RideRepository):
                 return record
             waiting.append(record)
             self._demo_waiting_ids[vehicle_id] = [item.request_id for item in waiting]
-            now = datetime.now(timezone.utc)
             matched_passenger_count = sum(item.passenger_count for item in waiting)
             for participant in waiting:
                 self._records[participant.request_id] = participant.model_copy(update={
@@ -278,7 +290,12 @@ class FirestoreRideRepository(RideRepository):
         return self.get(request_id)
 
     def join_demo_pool(
-        self, request_id: str, user_id: str, vehicle_id: str, group_size: int,
+        self,
+        request_id: str,
+        user_id: str,
+        vehicle_id: str,
+        group_size: int,
+        queue_ttl_seconds: float = 180.0,
     ) -> Optional[RideRequestRecord]:
         """Firestore 대기열에서 여러 사용자 호출을 원자적으로 공동 배차한다."""
 
@@ -305,21 +322,25 @@ class FirestoreRideRepository(RideRepository):
             waiting_refs = [self._collection.document(str(waiting_id)) for waiting_id in waiting_ids if waiting_id != request_id]
             waiting_snapshots = [waiting_ref.get(transaction=current) for waiting_ref in waiting_refs]
             participants: list[tuple] = []
+            now_datetime = datetime.now(timezone.utc)
             seen_users = {user_id}
             for waiting_ref, waiting_snapshot in zip(waiting_refs, waiting_snapshots):
                 if not waiting_snapshot.exists:
                     continue
                 waiting_data = waiting_snapshot.to_dict()
                 waiting_user = waiting_data.get("user_id")
+                waiting_record = RideRequestRecord.model_validate(waiting_data)
                 if waiting_data.get("status") != RideStatus.WAITING.value or not waiting_user or waiting_user in seen_users:
                     continue
+                if (now_datetime - waiting_record.updated_at).total_seconds() > queue_ttl_seconds:
+                    continue
                 seen_users.add(waiting_user)
-                participants.append((waiting_ref, RideRequestRecord.model_validate(waiting_data)))
+                participants.append((waiting_ref, waiting_record))
 
             if request_id in waiting_ids:
                 return True
             participants.append((document, RideRequestRecord.model_validate(data)))
-            now = datetime.now(timezone.utc).isoformat()
+            now = now_datetime.isoformat()
             matched_passenger_count = sum(participant.passenger_count for _, participant in participants)
             if matched_passenger_count < group_size:
                 waiting_update = {

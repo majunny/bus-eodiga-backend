@@ -19,6 +19,8 @@ services:
         value: "true"
       - key: DEMO_GROUP_SIZE
         value: "3"
+      - key: DEMO_QUEUE_TTL_SECONDS
+        value: "180"
       - key: DEMO_AUTO_SIMULATION
         value: "true"
       - key: DEMO_TRAVEL_SECONDS
