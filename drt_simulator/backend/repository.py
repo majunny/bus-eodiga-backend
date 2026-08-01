@@ -27,8 +27,10 @@ class RideRepository(ABC):
         """사용자가 소유한 대기 호출을 취소한다."""
 
     @abstractmethod
-    def join_demo_pool(self, request_id: str, user_id: str, vehicle_id: str) -> Optional[RideRequestRecord]:
-        """시연 대기열에 참여시키고 두 승객이 모이면 함께 배정한다."""
+    def join_demo_pool(
+        self, request_id: str, user_id: str, vehicle_id: str, group_size: int,
+    ) -> Optional[RideRequestRecord]:
+        """설정된 인원의 시연 승객이 모이면 함께 배정한다."""
 
 
 class MemoryRideRepository(RideRepository):
@@ -37,7 +39,7 @@ class MemoryRideRepository(RideRepository):
     def __init__(self) -> None:
         self._records: Dict[str, RideRequestRecord] = {}
         self._idempotency: Dict[str, str] = {}
-        self._demo_waiting_id: Optional[str] = None
+        self._demo_waiting_ids: list[str] = []
         self._lock = Lock()
 
     def create(self, record: RideRequestRecord, idempotency_key: str) -> RideRequestRecord:
@@ -69,42 +71,51 @@ class MemoryRideRepository(RideRepository):
             self._records[request_id] = updated
             return updated
 
-    def join_demo_pool(self, request_id: str, user_id: str, vehicle_id: str) -> Optional[RideRequestRecord]:
-        """첫 승객은 대기시키고 두 번째 승객과 같은 차량에 배정한다."""
+    def join_demo_pool(
+        self, request_id: str, user_id: str, vehicle_id: str, group_size: int,
+    ) -> Optional[RideRequestRecord]:
+        """최대 6명의 대기 상태를 갱신하고 정원이 차면 공동 배차한다."""
 
         with self._lock:
             record = self._records.get(request_id)
             if record is None or record.user_id != user_id:
                 return None
-            if record.status != RideStatus.WAITING or record.matched_passenger_count == 2:
+            if record.status != RideStatus.WAITING or record.matched_passenger_count >= group_size:
                 return record
-            waiting = self._records.get(self._demo_waiting_id or "")
-            if waiting is None or waiting.status != RideStatus.WAITING:
-                waiting = None
-                self._demo_waiting_id = None
-            if waiting is None or waiting.request_id == request_id or waiting.user_id == user_id:
-                updated = record.model_copy(update={
-                    "matched_passenger_count": 1,
-                    "updated_at": datetime.now(timezone.utc),
+            waiting = [
+                self._records[waiting_id]
+                for waiting_id in self._demo_waiting_ids
+                if waiting_id in self._records and self._records[waiting_id].status == RideStatus.WAITING
+            ]
+            if request_id in {item.request_id for item in waiting}:
+                return record
+            if user_id in {item.user_id for item in waiting}:
+                return record
+            waiting.append(record)
+            self._demo_waiting_ids = [item.request_id for item in waiting]
+            now = datetime.now(timezone.utc)
+            for participant in waiting:
+                self._records[participant.request_id] = participant.model_copy(update={
+                    "matched_passenger_count": len(waiting),
+                    "demo_group_size": group_size,
+                    "updated_at": now,
                 })
-                self._records[request_id] = updated
-                if waiting is None:
-                    self._demo_waiting_id = request_id
-                return updated
+            if len(waiting) < group_size:
+                return self._records[request_id]
 
             trip_id = str(uuid4())
-            route_stops = _build_demo_route_stops(waiting, record)
-            now = datetime.now(timezone.utc)
-            for matched in (waiting, record):
+            route_stops = _build_demo_route_stops(waiting)
+            for matched in waiting:
                 self._records[matched.request_id] = matched.model_copy(update={
                     "status": RideStatus.ASSIGNED,
                     "assigned_vehicle_id": vehicle_id,
                     "demo_trip_id": trip_id,
-                    "matched_passenger_count": 2,
+                    "matched_passenger_count": group_size,
+                    "demo_group_size": group_size,
                     "demo_route_stops": route_stops,
                     "updated_at": now,
                 })
-            self._demo_waiting_id = None
+            self._demo_waiting_ids = []
             return self._records[request_id]
 
 
@@ -172,8 +183,10 @@ class FirestoreRideRepository(RideRepository):
             return None
         return self.get(request_id)
 
-    def join_demo_pool(self, request_id: str, user_id: str, vehicle_id: str) -> Optional[RideRequestRecord]:
-        """Firestore 대기열에서 두 사용자 호출을 원자적으로 공동 배차한다."""
+    def join_demo_pool(
+        self, request_id: str, user_id: str, vehicle_id: str, group_size: int,
+    ) -> Optional[RideRequestRecord]:
+        """Firestore 대기열에서 여러 사용자 호출을 원자적으로 공동 배차한다."""
 
         document = self._collection.document(request_id)
         transaction = self._client.transaction()
@@ -186,44 +199,62 @@ class FirestoreRideRepository(RideRepository):
             data = snapshot.to_dict()
             if data.get("user_id") != user_id:
                 return False
-            if data.get("status") != RideStatus.WAITING.value or data.get("matched_passenger_count") == 2:
+            if data.get("status") != RideStatus.WAITING.value or data.get("matched_passenger_count") == group_size:
                 return True
 
             queue_snapshot = self._demo_queue.get(transaction=current)
-            waiting_id = queue_snapshot.to_dict().get("request_id") if queue_snapshot.exists else None
-            waiting_snapshot = None
-            waiting_ref = None
-            if waiting_id and waiting_id != request_id:
-                waiting_ref = self._collection.document(str(waiting_id))
-                waiting_snapshot = waiting_ref.get(transaction=current)
+            queue_data = queue_snapshot.to_dict() if queue_snapshot.exists else {}
+            waiting_ids = list(queue_data.get("request_ids") or [])
+            if not waiting_ids and queue_data.get("request_id"):
+                waiting_ids = [str(queue_data["request_id"])]
+            waiting_refs = [self._collection.document(str(waiting_id)) for waiting_id in waiting_ids if waiting_id != request_id]
+            waiting_snapshots = [waiting_ref.get(transaction=current) for waiting_ref in waiting_refs]
+            participants: list[tuple] = []
+            seen_users = {user_id}
+            for waiting_ref, waiting_snapshot in zip(waiting_refs, waiting_snapshots):
+                if not waiting_snapshot.exists:
+                    continue
+                waiting_data = waiting_snapshot.to_dict()
+                waiting_user = waiting_data.get("user_id")
+                if waiting_data.get("status") != RideStatus.WAITING.value or not waiting_user or waiting_user in seen_users:
+                    continue
+                seen_users.add(waiting_user)
+                participants.append((waiting_ref, RideRequestRecord.model_validate(waiting_data)))
 
-            waiting_data = waiting_snapshot.to_dict() if waiting_snapshot and waiting_snapshot.exists else None
-            can_pair = (
-                waiting_data is not None
-                and waiting_data.get("status") == RideStatus.WAITING.value
-                and waiting_data.get("user_id") != user_id
-            )
+            if request_id in waiting_ids:
+                return True
+            participants.append((document, RideRequestRecord.model_validate(data)))
             now = datetime.now(timezone.utc).isoformat()
-            if not can_pair or waiting_ref is None:
-                current.update(document, {"matched_passenger_count": 1, "updated_at": now})
-                if not waiting_id or waiting_data is None or waiting_data.get("status") != RideStatus.WAITING.value:
-                    current.set(self._demo_queue, {"request_id": request_id, "user_id": user_id, "updated_at": now})
+            if len(participants) < group_size:
+                waiting_update = {
+                    "matched_passenger_count": len(participants),
+                    "demo_group_size": group_size,
+                    "updated_at": now,
+                }
+                for participant_ref, _ in participants:
+                    current.update(participant_ref, waiting_update)
+                current.set(self._demo_queue, {
+                    "request_ids": [participant.request_id for _, participant in participants],
+                    "user_ids": [participant.user_id for _, participant in participants],
+                    "group_size": group_size,
+                    "updated_at": now,
+                })
                 return True
 
-            waiting_record = RideRequestRecord.model_validate(waiting_data)
-            current_record = RideRequestRecord.model_validate(data)
-            route_stops = [stop.model_dump(mode="json") for stop in _build_demo_route_stops(waiting_record, current_record)]
+            records = [participant for _, participant in participants[:group_size]]
+            route_stops = [stop.model_dump(mode="json") for stop in _build_demo_route_stops(records)]
             trip_id = str(uuid4())
             shared_update = {
                 "status": RideStatus.ASSIGNED.value,
                 "assigned_vehicle_id": vehicle_id,
                 "demo_trip_id": trip_id,
-                "matched_passenger_count": 2,
+                "matched_passenger_count": group_size,
+                "demo_group_size": group_size,
                 "demo_route_stops": route_stops,
                 "updated_at": now,
             }
-            current.update(waiting_ref, shared_update)
-            current.update(document, shared_update)
+            for participant_ref, _ in participants[:group_size]:
+                current.update(participant_ref, shared_update)
             current.delete(self._demo_queue)
             return True
 
@@ -232,10 +263,9 @@ class FirestoreRideRepository(RideRepository):
         return self.get(request_id)
 
 
-def _build_demo_route_stops(first: RideRequestRecord, second: RideRequestRecord) -> list:
-    """서쪽에서 동쪽으로 두 승차지를 거친 뒤 두 목적지로 운행한다."""
+def _build_demo_route_stops(records: list[RideRequestRecord]) -> list:
+    """서쪽에서 동쪽으로 모든 승차지를 거친 뒤 모든 목적지로 운행한다."""
 
-    records = [first, second]
     pickup_order = sorted(records, key=lambda item: item.pickup.location.longitude)
     destination_order = sorted(records, key=lambda item: item.destination.location.longitude)
     return [item.pickup for item in pickup_order] + [item.destination for item in destination_order]

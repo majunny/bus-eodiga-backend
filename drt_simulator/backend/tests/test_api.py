@@ -40,6 +40,7 @@ def make_client(routing_service: object | None = None) -> TestClient:
         dev_auth_token="test-token",
         store_backend="memory",
         enable_demo_dispatch=True,
+        demo_group_size=3,
     )
     return TestClient(
         create_app(
@@ -172,8 +173,8 @@ def test_idempotent_create_and_cancel() -> None:
     assert cancelled.json()["status"] == "CANCELLED"
 
 
-def test_demo_assignment_waits_for_two_users_and_assigns_shared_trip() -> None:
-    """첫 승객은 대기하고 두 번째 사용자가 합류하면 같은 운행에 배정한다."""
+def test_demo_assignment_waits_for_configured_group_and_assigns_shared_trip() -> None:
+    """설정된 세 승객이 모이면 모두 같은 운행에 배정한다."""
 
     client = make_client()
     first_headers = {
@@ -184,6 +185,10 @@ def test_demo_assignment_waits_for_two_users_and_assigns_shared_trip() -> None:
         "Authorization": "Bearer test-token:phone-two",
         "Idempotency-Key": "request-key-demo-phone-two",
     }
+    third_headers = {
+        "Authorization": "Bearer test-token:phone-three",
+        "Idempotency-Key": "request-key-demo-phone-three",
+    }
     first = client.post("/v1/ride-requests", headers=first_headers, json=request_payload())
     second_payload = request_payload()
     second_payload["pickup"] = {
@@ -192,6 +197,13 @@ def test_demo_assignment_waits_for_two_users_and_assigns_shared_trip() -> None:
         "location": {"latitude": 35.53843654, "longitude": 129.3528277},
     }
     second = client.post("/v1/ride-requests", headers=second_headers, json=second_payload)
+    third_payload = request_payload()
+    third_payload["pickup"] = {
+        "place_id": "city-hall-stop",
+        "name": "시청앞",
+        "location": {"latitude": 35.53915699, "longitude": 129.3123405},
+    }
+    third = client.post("/v1/ride-requests", headers=third_headers, json=third_payload)
 
     waiting = client.post(
         "/v1/ride-requests/{}/demo-assign".format(first.json()["request_id"]),
@@ -201,9 +213,16 @@ def test_demo_assignment_waits_for_two_users_and_assigns_shared_trip() -> None:
     assert waiting.json()["status"] == "WAITING"
     assert waiting.json()["matched_passenger_count"] == 1
 
-    assigned = client.post(
+    second_waiting = client.post(
         "/v1/ride-requests/{}/demo-assign".format(second.json()["request_id"]),
         headers={"Authorization": "Bearer test-token:phone-two"},
+    )
+    assert second_waiting.json()["status"] == "WAITING"
+    assert second_waiting.json()["matched_passenger_count"] == 2
+
+    assigned = client.post(
+        "/v1/ride-requests/{}/demo-assign".format(third.json()["request_id"]),
+        headers={"Authorization": "Bearer test-token:phone-three"},
     )
     refreshed_first = client.get(
         "/v1/ride-requests/{}".format(first.json()["request_id"]),
@@ -215,5 +234,6 @@ def test_demo_assignment_waits_for_two_users_and_assigns_shared_trip() -> None:
     assert refreshed_first.json()["status"] == "ASSIGNED"
     assert assigned.json()["assigned_vehicle_id"] == "demo-bus-01"
     assert assigned.json()["demo_trip_id"] == refreshed_first.json()["demo_trip_id"]
-    assert assigned.json()["matched_passenger_count"] == 2
-    assert len(assigned.json()["demo_route_stops"]) == 4
+    assert assigned.json()["matched_passenger_count"] == 3
+    assert assigned.json()["demo_group_size"] == 3
+    assert len(assigned.json()["demo_route_stops"]) == 6
