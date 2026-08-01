@@ -11,8 +11,13 @@ import math
 import time
 from pathlib import Path
 
-import car_route_v2
-from modi_ble_connection import connect_ble
+try:
+    import car_route_v2
+    from modi_ble_connection import connect_ble
+except ModuleNotFoundError:
+    # 친구 파일을 이 hardware 폴더에 함께 둘 때도 패키지 실행을 지원합니다.
+    from . import car_route_v2
+    from .modi_ble_connection import connect_ble
 
 
 TURN_SPEED_FAST = 55

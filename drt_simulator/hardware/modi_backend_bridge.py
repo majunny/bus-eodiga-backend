@@ -101,7 +101,7 @@ class ModiV4Driver:
         stop_mapping_path: Path,
     ) -> None:
         self.controller = importlib.import_module(controller_module)
-        self.car_route_v2 = importlib.import_module("car_route_v2")
+        self.car_route_v2 = self.controller.car_route_v2
         self.route_map = json.loads(route_map_path.read_text(encoding="utf-8"))
         mapping = json.loads(stop_mapping_path.read_text(encoding="utf-8"))
         self.place_to_node = dict(mapping.get("place_to_node") or {})
