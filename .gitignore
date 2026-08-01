@@ -17,6 +17,7 @@ google-services.json
 *.p12
 .pytest_cache/
 *.zip
+!releases/MODI_Kiosk_Windows.zip
 *.log
 drt_simulator/hardware/*.pt
 /26swbest2.pt
