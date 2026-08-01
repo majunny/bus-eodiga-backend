@@ -4,9 +4,10 @@ from fastapi.testclient import TestClient
 
 from backend.config import BackendSettings
 from backend.main import create_app
-from backend.models import FindNearestRouteRequest, FindNearestRouteResponse
+from backend.models import FindNearestRouteRequest, FindNearestRouteResponse, RideRequestCreate, RideRequestRecord
 from backend.repository import MemoryRideRepository
 from backend.routing import RoutingServiceError
+from backend.simulation import run_demo_trip_simulation
 
 
 class StubRoutingService:
@@ -237,3 +238,39 @@ def test_demo_assignment_waits_for_configured_group_and_assigns_shared_trip() ->
     assert assigned.json()["matched_passenger_count"] == 3
     assert assigned.json()["demo_group_size"] == 3
     assert len(assigned.json()["demo_route_stops"]) == 6
+
+
+def test_demo_simulation_picks_up_and_drops_off_every_rider() -> None:
+    """자동 운행은 모든 P 지점에서 탑승시키고 모든 D 지점에서 완료한다."""
+
+    repository = MemoryRideRepository()
+    records = []
+    pickup_ids = ["ulsan", "taehwa", "cityhall"]
+    pickup_longitudes = [129.1388, 129.3528, 129.3123]
+    for index in range(3):
+        payload = request_payload()
+        payload["pickup"] = {
+            "place_id": pickup_ids[index],
+            "name": f"승차 {index + 1}",
+            "location": {"latitude": 35.54 + index * 0.001, "longitude": pickup_longitudes[index]},
+        }
+        payload["destination"] = {
+            "place_id": f"drop-{index}",
+            "name": f"하차 {index + 1}",
+            "location": {"latitude": 35.52 + index * 0.001, "longitude": 129.38 + index * 0.01},
+        }
+        record = RideRequestRecord.new(f"request-{index}", f"user-{index}", RideRequestCreate.model_validate(payload))
+        repository.create(record, f"simulation-key-{index}")
+        records.append(record)
+
+    for record in records:
+        matched = repository.join_demo_pool(record.request_id, record.user_id, "demo-bus-01", 3)
+    trip_id = matched.demo_trip_id
+    assert trip_id is not None
+
+    run_demo_trip_simulation(repository, trip_id, travel_seconds=0, dwell_seconds=0)
+
+    completed = [repository.get(record.request_id) for record in records]
+    assert all(record is not None and record.status.value == "COMPLETED" for record in completed)
+    assert all(record is not None and record.demo_trip_phase == "COMPLETED" for record in completed)
+    assert all(record is not None and record.demo_current_stop_index == 5 for record in completed)

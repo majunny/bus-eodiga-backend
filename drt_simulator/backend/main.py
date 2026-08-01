@@ -3,7 +3,7 @@
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.auth import AuthenticatedUser, get_current_user
@@ -20,6 +20,7 @@ from backend.models import (
 )
 from backend.repository import FirestoreRideRepository, MemoryRideRepository, RideRepository
 from backend.routing import OsrmRoutingService, RoutingService, RoutingServiceError
+from backend.simulation import run_demo_trip_simulation
 
 
 def create_app(
@@ -148,6 +149,7 @@ def create_app(
     def assign_demo_vehicle(
         request_id: str,
         request: Request,
+        background_tasks: BackgroundTasks,
         user: AuthenticatedUser = Depends(get_current_user),
     ) -> RideRequestRecord:
         """대회 시연에서 Firestore 배차 이벤트를 실제로 발생시킨다."""
@@ -159,6 +161,14 @@ def create_app(
         record = store.join_demo_pool(request_id, user.uid, "demo-bus-01", current.demo_group_size)
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")
+        if current.demo_auto_simulation and record.demo_trip_id:
+            background_tasks.add_task(
+                run_demo_trip_simulation,
+                store,
+                record.demo_trip_id,
+                current.demo_travel_seconds,
+                current.demo_dwell_seconds,
+            )
         return record
 
     return application

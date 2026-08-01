@@ -84,6 +84,9 @@ class RideRequestRecord(RideRequestCreate):
     matched_passenger_count: int = Field(default=0, ge=0, le=6)
     demo_group_size: int = Field(default=3, ge=2, le=6)
     demo_route_stops: List[PlacePayload] = Field(default_factory=list)
+    demo_current_stop_index: int = Field(default=-1, ge=-1, le=12)
+    demo_trip_phase: str = "WAITING"
+    demo_vehicle_location: Optional[Coordinate] = None
     created_at: datetime
     updated_at: datetime
 

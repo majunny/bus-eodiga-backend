@@ -18,6 +18,9 @@ class BackendSettings(BaseSettings):
     allow_dev_auth: bool = False
     enable_demo_dispatch: bool = False
     demo_group_size: int = Field(default=3, ge=2, le=6)
+    demo_auto_simulation: bool = False
+    demo_travel_seconds: float = Field(default=5.0, ge=0.2, le=60.0)
+    demo_dwell_seconds: float = Field(default=2.0, ge=0.2, le=30.0)
     dev_auth_token: str = "local-demo-token"
     cors_origins: List[str] = Field(default_factory=list)
     osrm_base_url: str = "https://router.project-osrm.org"

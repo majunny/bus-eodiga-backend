@@ -32,6 +32,21 @@ class RideRepository(ABC):
     ) -> Optional[RideRequestRecord]:
         """설정된 인원의 시연 승객이 모이면 함께 배정한다."""
 
+    @abstractmethod
+    def claim_demo_trip_simulation(self, trip_id: str) -> Optional[dict]:
+        """한 서버 작업만 운행 시뮬레이션을 시작하도록 선점한다."""
+
+    @abstractmethod
+    def update_demo_trip_progress(
+        self,
+        trip_id: str,
+        stop_index: int,
+        phase: str,
+        request_id: Optional[str] = None,
+        request_status: Optional[RideStatus] = None,
+    ) -> None:
+        """공동 운행 진행 상태를 모든 참여 호출에 기록한다."""
+
 
 class MemoryRideRepository(RideRepository):
     """Firebase 없이 로컬 테스트에 사용하는 저장소."""
@@ -40,6 +55,7 @@ class MemoryRideRepository(RideRepository):
         self._records: Dict[str, RideRequestRecord] = {}
         self._idempotency: Dict[str, str] = {}
         self._demo_waiting_ids: list[str] = []
+        self._demo_trips: Dict[str, dict] = {}
         self._lock = Lock()
 
     def create(self, record: RideRequestRecord, idempotency_key: str) -> RideRequestRecord:
@@ -104,7 +120,8 @@ class MemoryRideRepository(RideRepository):
                 return self._records[request_id]
 
             trip_id = str(uuid4())
-            route_stops = _build_demo_route_stops(waiting)
+            route_plan = _build_demo_route_plan(waiting)
+            route_stops = [step["place"] for step in route_plan]
             for matched in waiting:
                 self._records[matched.request_id] = matched.model_copy(update={
                     "status": RideStatus.ASSIGNED,
@@ -113,10 +130,59 @@ class MemoryRideRepository(RideRepository):
                     "matched_passenger_count": group_size,
                     "demo_group_size": group_size,
                     "demo_route_stops": route_stops,
+                    "demo_current_stop_index": -1,
+                    "demo_trip_phase": "READY",
                     "updated_at": now,
                 })
+            self._demo_trips[trip_id] = {
+                "trip_id": trip_id,
+                "request_ids": [item.request_id for item in waiting],
+                "route_steps": [
+                    {**step, "place": step["place"].model_dump(mode="json")}
+                    for step in route_plan
+                ],
+                "simulation_started": False,
+                "phase": "READY",
+            }
             self._demo_waiting_ids = []
             return self._records[request_id]
+
+    def claim_demo_trip_simulation(self, trip_id: str) -> Optional[dict]:
+        """메모리 운행을 한 번만 시작한다."""
+
+        with self._lock:
+            trip = self._demo_trips.get(trip_id)
+            if trip is None or trip.get("simulation_started"):
+                return None
+            trip["simulation_started"] = True
+            return dict(trip)
+
+    def update_demo_trip_progress(
+        self,
+        trip_id: str,
+        stop_index: int,
+        phase: str,
+        request_id: Optional[str] = None,
+        request_status: Optional[RideStatus] = None,
+    ) -> None:
+        """메모리 참여 호출 전체에 동일한 진행 상태를 기록한다."""
+
+        with self._lock:
+            trip = self._demo_trips.get(trip_id)
+            if trip is None:
+                return
+            trip["phase"] = phase
+            trip["current_stop_index"] = stop_index
+            for participant_id in trip["request_ids"]:
+                record = self._records[participant_id]
+                update = {
+                    "demo_current_stop_index": stop_index,
+                    "demo_trip_phase": phase,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+                if participant_id == request_id and request_status is not None:
+                    update["status"] = request_status
+                self._records[participant_id] = record.model_copy(update=update)
 
 
 class FirestoreRideRepository(RideRepository):
@@ -127,6 +193,7 @@ class FirestoreRideRepository(RideRepository):
         self._collection = client.collection("ride_requests")
         self._idempotency = client.collection("ride_idempotency")
         self._demo_queue = client.collection("demo_dispatch").document("pair_queue")
+        self._demo_trips = client.collection("demo_trips")
 
     def create(self, record: RideRequestRecord, idempotency_key: str) -> RideRequestRecord:
         """Idempotency 문서와 호출 문서를 원자적으로 생성한다."""
@@ -242,7 +309,8 @@ class FirestoreRideRepository(RideRepository):
                 return True
 
             records = [participant for _, participant in participants[:group_size]]
-            route_stops = [stop.model_dump(mode="json") for stop in _build_demo_route_stops(records)]
+            route_plan = _build_demo_route_plan(records)
+            route_stops = [step["place"].model_dump(mode="json") for step in route_plan]
             trip_id = str(uuid4())
             shared_update = {
                 "status": RideStatus.ASSIGNED.value,
@@ -251,16 +319,89 @@ class FirestoreRideRepository(RideRepository):
                 "matched_passenger_count": group_size,
                 "demo_group_size": group_size,
                 "demo_route_stops": route_stops,
+                "demo_current_stop_index": -1,
+                "demo_trip_phase": "READY",
                 "updated_at": now,
             }
             for participant_ref, _ in participants[:group_size]:
                 current.update(participant_ref, shared_update)
+            current.set(self._demo_trips.document(trip_id), {
+                "trip_id": trip_id,
+                "vehicle_id": vehicle_id,
+                "request_ids": [record.request_id for record in records],
+                "user_ids": [record.user_id for record in records],
+                "route_steps": [
+                    {**step, "place": step["place"].model_dump(mode="json")}
+                    for step in route_plan
+                ],
+                "simulation_started": False,
+                "phase": "READY",
+                "current_stop_index": -1,
+                "created_at": now,
+                "updated_at": now,
+            })
             current.delete(self._demo_queue)
             return True
 
         if not match_in_transaction(transaction):
             return None
         return self.get(request_id)
+
+    def claim_demo_trip_simulation(self, trip_id: str) -> Optional[dict]:
+        """Firestore Transaction으로 시뮬레이션 실행권을 선점한다."""
+
+        document = self._demo_trips.document(trip_id)
+        transaction = self._client.transaction()
+
+        @firestore.transactional
+        def claim(current: firestore.Transaction) -> Optional[dict]:
+            snapshot = document.get(transaction=current)
+            if not snapshot.exists:
+                return None
+            data = snapshot.to_dict()
+            if data.get("simulation_started"):
+                return None
+            current.update(document, {
+                "simulation_started": True,
+                "phase": "RUNNING",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+            return data
+
+        return claim(transaction)
+
+    def update_demo_trip_progress(
+        self,
+        trip_id: str,
+        stop_index: int,
+        phase: str,
+        request_id: Optional[str] = None,
+        request_status: Optional[RideStatus] = None,
+    ) -> None:
+        """Batch로 모든 참여 호출과 내부 운행 문서를 함께 갱신한다."""
+
+        trip_ref = self._demo_trips.document(trip_id)
+        trip_snapshot = trip_ref.get()
+        if not trip_snapshot.exists:
+            return
+        trip = trip_snapshot.to_dict()
+        now = datetime.now(timezone.utc).isoformat()
+        batch = self._client.batch()
+        for participant_id in trip.get("request_ids") or []:
+            update = {
+                "demo_current_stop_index": stop_index,
+                "demo_trip_phase": phase,
+                "updated_at": now,
+            }
+            if participant_id == request_id and request_status is not None:
+                update["status"] = request_status.value
+            batch.update(self._collection.document(str(participant_id)), update)
+        batch.update(trip_ref, {
+            "current_stop_index": stop_index,
+            "phase": phase,
+            "updated_at": now,
+        })
+        batch.commit()
 
 
 def _build_demo_route_stops(records: list[RideRequestRecord]) -> list:
@@ -269,3 +410,17 @@ def _build_demo_route_stops(records: list[RideRequestRecord]) -> list:
     pickup_order = sorted(records, key=lambda item: item.pickup.location.longitude)
     destination_order = sorted(records, key=lambda item: item.destination.location.longitude)
     return [item.pickup for item in pickup_order] + [item.destination for item in destination_order]
+
+
+def _build_demo_route_plan(records: list[RideRequestRecord]) -> list[dict]:
+    """각 경유지를 소유 호출·승하차 종류와 함께 반환한다."""
+
+    pickup_order = sorted(records, key=lambda item: item.pickup.location.longitude)
+    destination_order = sorted(records, key=lambda item: item.destination.location.longitude)
+    return [
+        {"request_id": item.request_id, "type": "PICKUP", "order": index + 1, "place": item.pickup}
+        for index, item in enumerate(pickup_order)
+    ] + [
+        {"request_id": item.request_id, "type": "DROPOFF", "order": index + 1, "place": item.destination}
+        for index, item in enumerate(destination_order)
+    ]
