@@ -229,7 +229,8 @@ def create_app(
         )
         if pooled is None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Kiosk request could not join dispatch")
-        if current.demo_auto_simulation and not current.hardware_vehicle_control_enabled and pooled.demo_trip_id:
+        # MODI 운행은 실제 차량 브리지가 선점·보고한다. 일반 시연만 자동 운행한다.
+        if current.demo_auto_simulation and not current.hardware_vehicle_control_enabled and pooled.demo_trip_id and pooled.source not in {RequestSource.MODI_APP, RequestSource.MODI_KIOSK}:
             background_tasks.add_task(
                 run_demo_trip_simulation,
                 store,
@@ -303,7 +304,7 @@ def create_app(
         )
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")
-        if current.demo_auto_simulation and not current.hardware_vehicle_control_enabled and record.demo_trip_id:
+        if current.demo_auto_simulation and not current.hardware_vehicle_control_enabled and record.demo_trip_id and record.source not in {RequestSource.MODI_APP, RequestSource.MODI_KIOSK}:
             background_tasks.add_task(
                 run_demo_trip_simulation,
                 store,

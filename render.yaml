@@ -30,7 +30,9 @@ services:
       - key: DEMO_DWELL_SECONDS
         value: "2"
       - key: HARDWARE_VEHICLE_CONTROL_ENABLED
-        value: "false"
+        value: "true"
+      - key: VEHICLE_API_KEY
+        sync: false
       - key: MODI_KIOSK_API_ENABLED
         value: "true"
       - key: MODI_KIOSK_API_KEY

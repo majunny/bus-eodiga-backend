@@ -15,6 +15,17 @@ P1은 동부아파트입구에서 승차해 공업탑에서 내립니다. 이어
 
 이 고정 시나리오는 총 2개의 호출이 필요합니다. 한 호출의 동반 인원만으로는 출발하지 않습니다.
 
+## 친구 파일 없이 직접 MODI 차량 실행
+
+PyMODI+로 연결된 4개 모터와 IMU만 사용해 고정 경로를 실행할 수 있습니다. 차량 PC에 모형 지도를 놓고, 차량 앞을 지도에서 서쪽 방향으로 맞춘 뒤 실행합니다.
+
+```bash
+export BUS_EODIGA_VEHICLE_KEY='Render의 VEHICLE_API_KEY와 같은 값'
+python -m hardware.fixed_modi_vehicle
+```
+
+이 드라이버는 서버가 `31208 → 64201 → 40410 → 40404` 네 정류장 순서를 보내지 않으면 모터를 구동하지 않습니다. 첫 시험은 차량을 들어 올린 상태에서 `MODI_DRIVE_SPEED=20`으로 실행하고, 정상 회전이 확인된 뒤 속도를 올립니다.
+
 이 브리지는 Render의 공동 DRT 경유 순서를 받아 친구의 `MODI+ BLE + IMU V4` 자동차가 미니맵에서 같은 순서로 이동하게 합니다. 차량이 보고한 `EN_ROUTE`, `ARRIVED`, `BOARDED`, `DROPPED_OFF`, `COMPLETED` 상태는 Firestore를 통해 Android에 표시됩니다.
 
 ## 동부아파트입구 키오스크
