@@ -225,6 +225,7 @@ def create_app(
             "modi-bus-01",
             current.demo_group_size,
             current.demo_queue_ttl_seconds,
+            current.demo_min_request_count,
         )
         if pooled is None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Kiosk request could not join dispatch")
@@ -297,6 +298,7 @@ def create_app(
             vehicle_id,
             current.demo_group_size,
             current.demo_queue_ttl_seconds,
+            current.demo_min_request_count,
         )
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")

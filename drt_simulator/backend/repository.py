@@ -34,6 +34,7 @@ class RideRepository(ABC):
         vehicle_id: str,
         group_size: int,
         queue_ttl_seconds: float = 180.0,
+        min_request_count: int = 2,
     ) -> Optional[RideRequestRecord]:
         """설정된 인원의 시연 승객이 모이면 함께 배정한다."""
 
@@ -107,6 +108,7 @@ class MemoryRideRepository(RideRepository):
         vehicle_id: str,
         group_size: int,
         queue_ttl_seconds: float = 180.0,
+        min_request_count: int = 2,
     ) -> Optional[RideRequestRecord]:
         """본인과 동반 인원을 합산해 출발 기준을 충족하면 공동 배차한다."""
 
@@ -138,7 +140,7 @@ class MemoryRideRepository(RideRepository):
                     "demo_group_size": group_size,
                     "updated_at": now,
                 })
-            if matched_passenger_count < group_size:
+            if matched_passenger_count < group_size or len(waiting) < min_request_count:
                 return self._records[request_id]
 
             trip_id = str(uuid4())
@@ -296,6 +298,7 @@ class FirestoreRideRepository(RideRepository):
         vehicle_id: str,
         group_size: int,
         queue_ttl_seconds: float = 180.0,
+        min_request_count: int = 2,
     ) -> Optional[RideRequestRecord]:
         """Firestore 대기열에서 여러 사용자 호출을 원자적으로 공동 배차한다."""
 
@@ -342,7 +345,7 @@ class FirestoreRideRepository(RideRepository):
             participants.append((document, RideRequestRecord.model_validate(data)))
             now = now_datetime.isoformat()
             matched_passenger_count = sum(participant.passenger_count for _, participant in participants)
-            if matched_passenger_count < group_size:
+            if matched_passenger_count < group_size or len(participants) < min_request_count:
                 waiting_update = {
                     "matched_passenger_count": matched_passenger_count,
                     "demo_group_size": group_size,

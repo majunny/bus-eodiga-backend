@@ -18,6 +18,7 @@ class BackendSettings(BaseSettings):
     allow_dev_auth: bool = False
     enable_demo_dispatch: bool = False
     demo_group_size: int = Field(default=3, ge=2, le=6)
+    demo_min_request_count: int = Field(default=2, ge=2, le=6)
     demo_queue_ttl_seconds: float = Field(default=180.0, ge=30.0, le=3600.0)
     demo_auto_simulation: bool = False
     demo_travel_seconds: float = Field(default=5.0, ge=0.2, le=60.0)

@@ -442,6 +442,30 @@ def test_demo_assignment_counts_companions_toward_departure() -> None:
     assert len(assigned.json()["demo_route_stops"]) == 4
 
 
+def test_one_phone_cannot_depart_even_with_many_companions() -> None:
+    """총 인원이 기준 이상이어도 서로 다른 호출이 하나뿐이면 대기한다."""
+
+    client = make_client()
+    payload = request_payload()
+    payload["passenger_count"] = 4
+    created = client.post(
+        "/v1/ride-requests",
+        headers={
+            "Authorization": "Bearer test-token:one-phone",
+            "Idempotency-Key": "request-key-one-phone",
+        },
+        json=payload,
+    )
+    joined = client.post(
+        f"/v1/ride-requests/{created.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:one-phone"},
+    )
+
+    assert joined.json()["status"] == "WAITING"
+    assert joined.json()["matched_passenger_count"] == 4
+    assert joined.json()["demo_trip_id"] is None
+
+
 def test_expired_demo_waiter_does_not_start_a_new_trip() -> None:
     """오래된 시연 호출은 새 승객의 출발 인원에 포함하지 않는다."""
 
@@ -497,15 +521,35 @@ def test_hardware_vehicle_claims_trip_and_reports_progress() -> None:
 
     client = make_client()
     payload = request_payload()
-    payload["passenger_count"] = 3
+    payload["passenger_count"] = 2
     user_headers = {
         "Authorization": "Bearer test-token:modi-rider",
         "Idempotency-Key": "request-key-modi-rider",
     }
     created = client.post("/v1/ride-requests", headers=user_headers, json=payload)
-    assigned = client.post(
+    waiting = client.post(
         f"/v1/ride-requests/{created.json()['request_id']}/demo-assign",
         headers={"Authorization": "Bearer test-token:modi-rider"},
+    )
+    assert waiting.json()["status"] == "WAITING"
+
+    second_payload = request_payload()
+    second_payload["pickup"] = {
+        "place_id": "city-hall-stop",
+        "name": "시청앞",
+        "location": {"latitude": 35.53915699, "longitude": 129.3123405},
+    }
+    second = client.post(
+        "/v1/ride-requests",
+        headers={
+            "Authorization": "Bearer test-token:hardware-rider-two",
+            "Idempotency-Key": "request-key-hardware-rider-two",
+        },
+        json=second_payload,
+    )
+    assigned = client.post(
+        f"/v1/ride-requests/{second.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:hardware-rider-two"},
     )
     trip_id = assigned.json()["demo_trip_id"]
     assert trip_id
@@ -517,7 +561,7 @@ def test_hardware_vehicle_claims_trip_and_reports_progress() -> None:
     polled = client.get("/v1/vehicles/demo-bus-01/trips/next", headers=vehicle_headers)
     assert polled.status_code == 200
     assert polled.json()["trip"]["trip_id"] == trip_id
-    assert len(polled.json()["trip"]["route_steps"]) == 2
+    assert len(polled.json()["trip"]["route_steps"]) == 4
 
     claimed = client.post(
         f"/v1/vehicles/demo-bus-01/trips/{trip_id}/claim",
@@ -527,15 +571,11 @@ def test_hardware_vehicle_claims_trip_and_reports_progress() -> None:
     assert claimed.json()["simulation_started"] is True
     assert claimed.json()["phase"] == "RUNNING"
 
-    phases = [
-        (0, "EN_ROUTE"),
-        (0, "ARRIVED"),
-        (0, "BOARDED"),
-        (1, "EN_ROUTE"),
-        (1, "ARRIVED"),
-        (1, "DROPPED_OFF"),
-        (1, "COMPLETED"),
-    ]
+    phases = []
+    for stop_index, step in enumerate(polled.json()["trip"]["route_steps"]):
+        phases.extend([(stop_index, "EN_ROUTE"), (stop_index, "ARRIVED")])
+        phases.append((stop_index, "BOARDED" if step["type"] == "PICKUP" else "DROPPED_OFF"))
+    phases.append((3, "COMPLETED"))
     for stop_index, phase in phases:
         progress = client.post(
             f"/v1/vehicles/demo-bus-01/trips/{trip_id}/progress",
