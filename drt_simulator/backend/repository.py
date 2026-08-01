@@ -62,7 +62,7 @@ class MemoryRideRepository(RideRepository):
     def __init__(self) -> None:
         self._records: Dict[str, RideRequestRecord] = {}
         self._idempotency: Dict[str, str] = {}
-        self._demo_waiting_ids: list[str] = []
+        self._demo_waiting_ids: Dict[str, list[str]] = {}
         self._demo_trips: Dict[str, dict] = {}
         self._lock = Lock()
 
@@ -106,9 +106,10 @@ class MemoryRideRepository(RideRepository):
                 return None
             if record.status != RideStatus.WAITING:
                 return record
+            waiting_ids = self._demo_waiting_ids.get(vehicle_id, [])
             waiting = [
                 self._records[waiting_id]
-                for waiting_id in self._demo_waiting_ids
+                for waiting_id in waiting_ids
                 if waiting_id in self._records and self._records[waiting_id].status == RideStatus.WAITING
             ]
             if request_id in {item.request_id for item in waiting}:
@@ -116,7 +117,7 @@ class MemoryRideRepository(RideRepository):
             if user_id in {item.user_id for item in waiting}:
                 return record
             waiting.append(record)
-            self._demo_waiting_ids = [item.request_id for item in waiting]
+            self._demo_waiting_ids[vehicle_id] = [item.request_id for item in waiting]
             now = datetime.now(timezone.utc)
             matched_passenger_count = sum(item.passenger_count for item in waiting)
             for participant in waiting:
@@ -154,7 +155,7 @@ class MemoryRideRepository(RideRepository):
                 "simulation_started": False,
                 "phase": "READY",
             }
-            self._demo_waiting_ids = []
+            self._demo_waiting_ids[vehicle_id] = []
             return self._records[request_id]
 
     def claim_demo_trip_simulation(self, trip_id: str) -> Optional[dict]:
@@ -218,7 +219,7 @@ class FirestoreRideRepository(RideRepository):
         self._client = client
         self._collection = client.collection("ride_requests")
         self._idempotency = client.collection("ride_idempotency")
-        self._demo_queue = client.collection("demo_dispatch").document("pair_queue")
+        self._demo_dispatch = client.collection("demo_dispatch")
         self._demo_trips = client.collection("demo_trips")
 
     def create(self, record: RideRequestRecord, idempotency_key: str) -> RideRequestRecord:
@@ -282,6 +283,7 @@ class FirestoreRideRepository(RideRepository):
         """Firestore 대기열에서 여러 사용자 호출을 원자적으로 공동 배차한다."""
 
         document = self._collection.document(request_id)
+        demo_queue = self._demo_dispatch.document(f"queue_{vehicle_id}")
         transaction = self._client.transaction()
 
         @firestore.transactional
@@ -295,7 +297,7 @@ class FirestoreRideRepository(RideRepository):
             if data.get("status") != RideStatus.WAITING.value:
                 return True
 
-            queue_snapshot = self._demo_queue.get(transaction=current)
+            queue_snapshot = demo_queue.get(transaction=current)
             queue_data = queue_snapshot.to_dict() if queue_snapshot.exists else {}
             waiting_ids = list(queue_data.get("request_ids") or [])
             if not waiting_ids and queue_data.get("request_id"):
@@ -327,7 +329,7 @@ class FirestoreRideRepository(RideRepository):
                 }
                 for participant_ref, _ in participants:
                     current.update(participant_ref, waiting_update)
-                current.set(self._demo_queue, {
+                current.set(demo_queue, {
                     "request_ids": [participant.request_id for _, participant in participants],
                     "user_ids": [participant.user_id for _, participant in participants],
                     "group_size": group_size,
@@ -367,7 +369,7 @@ class FirestoreRideRepository(RideRepository):
                 "created_at": now,
                 "updated_at": now,
             })
-            current.delete(self._demo_queue)
+            current.delete(demo_queue)
             return True
 
         if not match_in_transaction(transaction):

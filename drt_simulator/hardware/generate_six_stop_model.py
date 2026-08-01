@@ -8,14 +8,7 @@ import math
 from itertools import permutations
 from pathlib import Path
 
-BUS_STOPS = [
-    {"name": "동부아파트입구", "latitude": 35.52742029, "longitude": 129.3225519, "stop_id": "31208"},
-    {"name": "수암시장앞", "latitude": 35.52792702, "longitude": 129.3207326, "stop_id": "31205"},
-    {"name": "공업탑", "latitude": 35.53301001, "longitude": 129.3097744, "stop_id": "40404"},
-    {"name": "달동현대아파트앞", "latitude": 35.53630572, "longitude": 129.3237411, "stop_id": "40411"},
-    {"name": "강남초등학교", "latitude": 35.5358198, "longitude": 129.3205483, "stop_id": "40410"},
-    {"name": "롯데마트", "latitude": 35.5336866, "longitude": 129.3167411, "stop_id": "64201"},
-]
+from backend.modi_stops import MODI_BUS_STOPS as BUS_STOPS
 
 
 def build_model(width_cm: float, height_cm: float, margin_cm: float = 8.0) -> tuple[dict, dict, list[dict]]:

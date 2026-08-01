@@ -2,6 +2,25 @@
 
 이 브리지는 Render의 공동 DRT 경유 순서를 받아 친구의 `MODI+ BLE + IMU V4` 자동차가 미니맵에서 같은 순서로 이동하게 합니다. 차량이 보고한 `EN_ROUTE`, `ARRIVED`, `BOARDED`, `DROPPED_OFF`, `COMPLETED` 상태는 Firestore를 통해 Android에 표시됩니다.
 
+## 동부아파트입구 키오스크
+
+`modi_station_kiosk.py`는 웹캠 카드 인식, 조이스틱 목적지 선택, 버튼 호출, 환경 센서 소음 감지와 디스플레이·LED·스피커를 담당합니다. 키오스크의 승차 정류장은 동부아파트입구로 고정되며 나머지 5개 정류장을 목적지로 선택합니다. Firestore에 직접 쓰지 않고 Render API를 호출하므로 Android의 MODI 호출과 같은 `modi-bus-01` 공동 배차열에 참여합니다.
+
+Render에는 다음 값을 설정합니다.
+
+```text
+MODI_KIOSK_API_ENABLED=true
+MODI_KIOSK_API_KEY=차량키와-다른-긴-비밀키
+```
+
+PC에서는 같은 키와 OpenAI 키를 환경변수로 전달합니다. OpenAI 키가 없으면 호출 기능은 작동하고 소음 이미지 AI 분석만 생략됩니다.
+
+```bash
+export BUS_EODIGA_KIOSK_KEY='Render와 같은 키'
+export OPENAI_API_KEY='사용할 OpenAI 키'
+python -m hardware.modi_station_kiosk
+```
+
 ## 필요한 친구 파일
 
 아래 파일은 현재 저장소에 없으므로 친구에게 받아 이 `hardware/` 폴더에 두어야 합니다.

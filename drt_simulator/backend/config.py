@@ -23,6 +23,8 @@ class BackendSettings(BaseSettings):
     demo_dwell_seconds: float = Field(default=2.0, ge=0.2, le=30.0)
     hardware_vehicle_control_enabled: bool = False
     vehicle_api_key: str = ""
+    modi_kiosk_api_enabled: bool = False
+    modi_kiosk_api_key: str = ""
     dev_auth_token: str = "local-demo-token"
     cors_origins: List[str] = Field(default_factory=list)
     osrm_base_url: str = "https://router.project-osrm.org"

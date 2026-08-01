@@ -1,0 +1,6 @@
+httpx>=0.27,<1
+openai>=1.0,<3
+opencv-python>=4.10,<5
+ultralytics>=8.3,<9
+
+# modi_plus는 사용 중인 MODI+ SDK 설치 방식에 맞춰 별도로 설치하세요.

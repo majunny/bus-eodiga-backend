@@ -27,6 +27,10 @@ services:
         value: "2"
       - key: HARDWARE_VEHICLE_CONTROL_ENABLED
         value: "false"
+      - key: MODI_KIOSK_API_ENABLED
+        value: "true"
+      - key: MODI_KIOSK_API_KEY
+        sync: false
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_CREDENTIALS_JSON

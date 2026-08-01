@@ -228,7 +228,7 @@ def execute_trip(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render DRT 운행을 MODI+ 자동차와 연결합니다.")
     parser.add_argument("--api-url", default=os.getenv("BUS_EODIGA_API_URL", DEFAULT_API_URL))
-    parser.add_argument("--vehicle-id", default=os.getenv("BUS_EODIGA_VEHICLE_ID", "demo-bus-01"))
+    parser.add_argument("--vehicle-id", default=os.getenv("BUS_EODIGA_VEHICLE_ID", "modi-bus-01"))
     parser.add_argument("--api-key", default=os.getenv("BUS_EODIGA_VEHICLE_KEY", ""))
     parser.add_argument("--poll-seconds", type=float, default=2.0)
     parser.add_argument("--dwell-seconds", type=float, default=2.0)

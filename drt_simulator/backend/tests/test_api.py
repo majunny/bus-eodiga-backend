@@ -77,6 +77,8 @@ def make_client(
         demo_group_size=3,
         hardware_vehicle_control_enabled=True,
         vehicle_api_key="test-vehicle-key",
+        modi_kiosk_api_enabled=True,
+        modi_kiosk_api_key="test-kiosk-key",
     )
     return TestClient(
         create_app(
@@ -212,6 +214,90 @@ def test_authentication_is_required() -> None:
         json=request_payload(),
     )
     assert response.status_code == 401
+
+
+def test_modi_kiosk_requires_key_and_uses_only_model_stops() -> None:
+    """키오스크는 전용 키와 여섯 정류장 ID만 사용할 수 있다."""
+
+    client = make_client()
+    payload = {
+        "device_id": "dongbu-kiosk-01",
+        "destination_place_id": "64201",
+        "mobility_support": "WHEELCHAIR",
+    }
+    missing_key = client.post(
+        "/v1/modi-kiosk/ride-requests",
+        headers={"Idempotency-Key": "kiosk-request-0001"},
+        json=payload,
+    )
+    assert missing_key.status_code == 401
+
+    invalid = client.post(
+        "/v1/modi-kiosk/ride-requests",
+        headers={"X-Kiosk-Key": "test-kiosk-key", "Idempotency-Key": "kiosk-request-0002"},
+        json={**payload, "destination_place_id": "57172"},
+    )
+    assert invalid.status_code == 422
+
+    valid = client.post(
+        "/v1/modi-kiosk/ride-requests",
+        headers={"X-Kiosk-Key": "test-kiosk-key", "Idempotency-Key": "kiosk-request-0003"},
+        json=payload,
+    )
+    assert valid.status_code == 201
+    assert valid.json()["source"] == "MODI_KIOSK"
+    assert valid.json()["pickup"]["place_id"] == "31208"
+    assert valid.json()["destination"]["place_id"] == "64201"
+    assert valid.json()["assigned_vehicle_id"] is None
+
+
+def test_modi_and_general_demo_requests_use_separate_vehicle_queues() -> None:
+    """일반 시연 호출은 물리 모형의 여섯 정류장 배차에 섞이지 않는다."""
+
+    client = make_client()
+    kiosk = client.post(
+        "/v1/modi-kiosk/ride-requests",
+        headers={"X-Kiosk-Key": "test-kiosk-key", "Idempotency-Key": "kiosk-separate-0001"},
+        json={"device_id": "dongbu-kiosk-01", "destination_place_id": "64201"},
+    )
+    assert kiosk.json()["matched_passenger_count"] == 1
+
+    normal = client.post(
+        "/v1/ride-requests",
+        headers={"Authorization": "Bearer test-token:normal", "Idempotency-Key": "normal-separate-0001"},
+        json=request_payload(),
+    )
+    normal_joined = client.post(
+        f"/v1/ride-requests/{normal.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:normal"},
+    )
+    assert normal_joined.json()["matched_passenger_count"] == 1
+
+    modi_payload = request_payload()
+    modi_payload.update({
+        "source": "MODI_APP",
+        "pickup": {
+            "place_id": "31205",
+            "name": "수암시장앞",
+            "location": {"latitude": 35.52792702, "longitude": 129.3207326},
+        },
+        "destination": {
+            "place_id": "40404",
+            "name": "공업탑",
+            "location": {"latitude": 35.53301001, "longitude": 129.3097744},
+        },
+    })
+    modi = client.post(
+        "/v1/ride-requests",
+        headers={"Authorization": "Bearer test-token:modi", "Idempotency-Key": "modi-separate-0001"},
+        json=modi_payload,
+    )
+    modi_joined = client.post(
+        f"/v1/ride-requests/{modi.json()['request_id']}/demo-assign",
+        headers={"Authorization": "Bearer test-token:modi"},
+    )
+    assert modi_joined.json()["matched_passenger_count"] == 2
+    assert modi_joined.json()["assigned_vehicle_id"] is None
 
 
 def test_idempotent_create_and_cancel() -> None:

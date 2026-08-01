@@ -13,6 +13,8 @@ class RequestSource(str, Enum):
     ANDROID_APP = "ANDROID_APP"
     CAMERA_CARD = "CAMERA_CARD"
     STATION_DEVICE = "STATION_DEVICE"
+    MODI_KIOSK = "MODI_KIOSK"
+    MODI_APP = "MODI_APP"
 
 
 class MobilitySupport(str, Enum):
@@ -71,6 +73,15 @@ class RideRequestCreate(BaseModel):
         if pickup and pickup.place_id == destination.place_id:
             raise ValueError("pickup and destination must be different")
         return destination
+
+
+class ModiKioskRideRequestCreate(BaseModel):
+    """동부아파트입구 MODI 키오스크에서 들어오는 간소화 호출."""
+
+    device_id: str = Field(default="dongbu-kiosk-01", min_length=3, max_length=100)
+    destination_place_id: str = Field(min_length=1, max_length=100)
+    passenger_count: int = Field(default=1, ge=1, le=6)
+    mobility_support: MobilitySupport = MobilitySupport.STANDARD
 
 
 class RideRequestRecord(RideRequestCreate):

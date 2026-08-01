@@ -16,6 +16,8 @@ from backend.models import (
     FindNearestRouteResponse,
     BusStopResponse,
     HealthResponse,
+    ModiKioskRideRequestCreate,
+    RequestSource,
     RideRequestCreate,
     RideRequestRecord,
     RideStatus,
@@ -25,6 +27,7 @@ from backend.models import (
     VehicleTripResponse,
 )
 from backend.place_search import NominatimPlaceSearchService, PlaceSearchError, PlaceSearchService
+from backend.modi_stops import MODI_DEPOT_STOP_ID, MODI_STOPS_BY_ID, modi_place
 from backend.repository import FirestoreRideRepository, MemoryRideRepository, RideRepository
 from backend.routing import OsrmRoutingService, RoutingService, RoutingServiceError
 from backend.simulation import run_demo_trip_simulation
@@ -41,6 +44,19 @@ def require_vehicle_api_key(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware vehicle control is disabled")
     if not settings.vehicle_api_key or not compare_digest(vehicle_api_key, settings.vehicle_api_key):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid vehicle API key")
+
+
+def require_modi_kiosk_api_key(
+    request: Request,
+    kiosk_api_key: str = Header(default="", alias="X-Kiosk-Key"),
+) -> None:
+    """동부아파트 MODI 키오스크 전용 공유키를 검증한다."""
+
+    settings: BackendSettings = request.app.state.settings
+    if not settings.modi_kiosk_api_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="MODI kiosk API is disabled")
+    if not settings.modi_kiosk_api_key or not compare_digest(kiosk_api_key, settings.modi_kiosk_api_key):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid kiosk API key")
 
 
 def create_app(
@@ -78,7 +94,7 @@ def create_app(
             allow_origins=active_settings.cors_origins,
             allow_credentials=True,
             allow_methods=["GET", "POST"],
-            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Vehicle-Key"],
+            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Vehicle-Key", "X-Kiosk-Key"],
         )
 
     @application.get("/health", response_model=HealthResponse)
@@ -156,6 +172,71 @@ def create_app(
         record = RideRequestRecord.new(str(uuid4()), user.uid, payload)
         return store.create(record, idempotency_key)
 
+    @application.post(
+        "/v1/modi-kiosk/ride-requests",
+        response_model=RideRequestRecord,
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_modi_kiosk_api_key)],
+    )
+    def create_modi_kiosk_ride_request(
+        payload: ModiKioskRideRequestCreate,
+        request: Request,
+        background_tasks: BackgroundTasks,
+        idempotency_key: str = Header(alias="Idempotency-Key", min_length=8, max_length=200),
+    ) -> RideRequestRecord:
+        """동부아파트 키오스크 호출을 만들고 Android와 같은 공동 배차열에 참여시킨다."""
+
+        try:
+            pickup = modi_place(MODI_DEPOT_STOP_ID)
+            destination = modi_place(payload.destination_place_id)
+        except KeyError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Destination is not one of the six MODI stops",
+            ) from error
+        if destination.place_id == pickup.place_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Destination must differ from the Dongbu depot stop",
+            )
+
+        current: BackendSettings = request.app.state.settings
+        if not current.enable_demo_dispatch:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo dispatch is disabled")
+        store: RideRepository = request.app.state.ride_repository
+        request_id = str(uuid4())
+        user_id = f"modi-kiosk:{payload.device_id}:{request_id}"
+        record = RideRequestRecord.new(
+            request_id,
+            user_id,
+            RideRequestCreate(
+                source=RequestSource.MODI_KIOSK,
+                pickup=pickup,
+                destination=destination,
+                passenger_count=payload.passenger_count,
+                mobility_support=payload.mobility_support,
+                guardian_notification_enabled=False,
+            ),
+        )
+        saved = store.create(record, idempotency_key)
+        pooled = store.join_demo_pool(
+            saved.request_id,
+            saved.user_id,
+            "modi-bus-01",
+            current.demo_group_size,
+        )
+        if pooled is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Kiosk request could not join dispatch")
+        if current.demo_auto_simulation and not current.hardware_vehicle_control_enabled and pooled.demo_trip_id:
+            background_tasks.add_task(
+                run_demo_trip_simulation,
+                store,
+                pooled.demo_trip_id,
+                current.demo_travel_seconds,
+                current.demo_dwell_seconds,
+            )
+        return pooled
+
     @application.get("/v1/ride-requests/{request_id}", response_model=RideRequestRecord)
     def get_ride_request(
         request_id: str,
@@ -197,7 +278,19 @@ def create_app(
         if not current.enable_demo_dispatch:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo dispatch is disabled")
         store: RideRepository = request.app.state.ride_repository
-        record = store.join_demo_pool(request_id, user.uid, "demo-bus-01", current.demo_group_size)
+        existing = store.get(request_id)
+        if existing is None or existing.user_id != user.uid:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")
+        is_modi_request = existing.source in {RequestSource.MODI_APP, RequestSource.MODI_KIOSK}
+        if is_modi_request:
+            place_ids = {existing.pickup.place_id, existing.destination.place_id}
+            if not place_ids.issubset(MODI_STOPS_BY_ID):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="MODI requests may use only the six model stops",
+                )
+        vehicle_id = "modi-bus-01" if is_modi_request else "demo-bus-01"
+        record = store.join_demo_pool(request_id, user.uid, vehicle_id, current.demo_group_size)
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")
         if current.demo_auto_simulation and not current.hardware_vehicle_control_enabled and record.demo_trip_id:
