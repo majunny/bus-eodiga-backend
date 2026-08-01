@@ -17,7 +17,9 @@ from backend.models import (
     HealthResponse,
     RideRequestCreate,
     RideRequestRecord,
+    PlaceSearchResponse,
 )
+from backend.place_search import NominatimPlaceSearchService, PlaceSearchError, PlaceSearchService
 from backend.repository import FirestoreRideRepository, MemoryRideRepository, RideRepository
 from backend.routing import OsrmRoutingService, RoutingService, RoutingServiceError
 from backend.simulation import run_demo_trip_simulation
@@ -28,6 +30,7 @@ def create_app(
     repository: Optional[RideRepository] = None,
     routing_service: Optional[RoutingService] = None,
     bus_stop_service: Optional[BusStopService] = None,
+    place_search_service: Optional[PlaceSearchService] = None,
 ) -> FastAPI:
     """설정과 저장소를 주입할 수 있는 FastAPI 앱을 생성한다."""
 
@@ -46,6 +49,10 @@ def create_app(
         timeout_seconds=active_settings.routing_timeout_seconds,
     )
     application.state.bus_stop_service = bus_stop_service or get_bus_stop_service()
+    application.state.place_search_service = place_search_service or NominatimPlaceSearchService(
+        base_url=active_settings.nominatim_base_url,
+        timeout_seconds=active_settings.place_search_timeout_seconds,
+    )
 
     if active_settings.cors_origins:
         application.add_middleware(
@@ -99,6 +106,20 @@ def create_app(
 
         service: BusStopService = request.app.state.bus_stop_service
         return service.nearby(latitude, longitude, radius_m, limit)
+
+    @application.get("/v1/places/search", response_model=list[PlaceSearchResponse])
+    def search_places(
+        request: Request,
+        query: str = Query(min_length=2, max_length=100),
+        limit: int = Query(default=10, ge=1, le=10),
+    ) -> list[PlaceSearchResponse]:
+        """도착지 이름으로 울산 영역의 OSM 장소를 검색한다."""
+
+        service: PlaceSearchService = request.app.state.place_search_service
+        try:
+            return service.search(query=query, limit=limit)
+        except PlaceSearchError as error:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
 
     @application.post(
         "/v1/ride-requests",

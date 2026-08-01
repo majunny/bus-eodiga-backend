@@ -149,3 +149,14 @@ class BusStopResponse(BaseModel):
     longitude: float = Field(ge=-180.0, le=180.0)
     district: str
     distance_m: Optional[float] = Field(default=None, ge=0.0)
+
+
+class PlaceSearchResponse(BaseModel):
+    """Android 도착지 검색에 제공하는 울산 장소 정보."""
+
+    place_id: str
+    name: str
+    address: str
+    latitude: float = Field(ge=-90.0, le=90.0)
+    longitude: float = Field(ge=-180.0, le=180.0)
+    category: str = "PLACE"

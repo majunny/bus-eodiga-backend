@@ -4,7 +4,14 @@ from fastapi.testclient import TestClient
 
 from backend.config import BackendSettings
 from backend.main import create_app
-from backend.models import FindNearestRouteRequest, FindNearestRouteResponse, RideRequestCreate, RideRequestRecord
+from backend.models import (
+    FindNearestRouteRequest,
+    FindNearestRouteResponse,
+    PlaceSearchResponse,
+    RideRequestCreate,
+    RideRequestRecord,
+)
+from backend.place_search import PlaceSearchError
 from backend.repository import MemoryRideRepository
 from backend.routing import RoutingServiceError
 from backend.simulation import run_demo_trip_simulation
@@ -33,7 +40,33 @@ class FailingRoutingService:
         raise RoutingServiceError("경로를 계산할 수 없습니다.")
 
 
-def make_client(routing_service: object | None = None) -> TestClient:
+class StubPlaceSearchService:
+    """외부 네트워크 없이 도착지 검색 계약을 검증하는 테스트 대역."""
+
+    def search(self, query: str, limit: int) -> list[PlaceSearchResponse]:
+        return [
+            PlaceSearchResponse(
+                place_id="osm-node-123",
+                name=query,
+                address="울산광역시 남구 대학로 93",
+                latitude=35.5438,
+                longitude=129.2564,
+                category="AMENITY",
+            )
+        ][:limit]
+
+
+class FailingPlaceSearchService:
+    """외부 장소 검색 장애 응답을 검증하는 테스트 대역."""
+
+    def search(self, query: str, limit: int) -> list[PlaceSearchResponse]:
+        raise PlaceSearchError("울산 장소 검색 서버에 연결하지 못했습니다.")
+
+
+def make_client(
+    routing_service: object | None = None,
+    place_search_service: object | None = None,
+) -> TestClient:
     """개발 인증이 활성화된 격리 테스트 클라이언트를 생성한다."""
 
     settings = BackendSettings(
@@ -48,6 +81,7 @@ def make_client(routing_service: object | None = None) -> TestClient:
             settings=settings,
             repository=MemoryRideRepository(),
             routing_service=routing_service or StubRoutingService(),
+            place_search_service=place_search_service or StubPlaceSearchService(),
         )
     )
 
@@ -137,6 +171,34 @@ def test_bus_stop_search_and_nearby_are_public() -> None:
     )
     assert nearby.status_code == 200
     assert nearby.json()[0]["distance_m"] == 0.0
+
+
+def test_destination_place_search_is_public() -> None:
+    """Android는 인증 없이 울산 목적지를 이름으로 조회할 수 있다."""
+
+    response = make_client().get("/v1/places/search", params={"query": "울산대학교", "limit": 5})
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "place_id": "osm-node-123",
+            "name": "울산대학교",
+            "address": "울산광역시 남구 대학로 93",
+            "latitude": 35.5438,
+            "longitude": 129.2564,
+            "category": "AMENITY",
+        }
+    ]
+
+
+def test_destination_place_search_reports_upstream_failure() -> None:
+    """OSM 장소 검색 장애는 명확한 502 응답으로 변환해야 한다."""
+
+    response = make_client(place_search_service=FailingPlaceSearchService()).get(
+        "/v1/places/search",
+        params={"query": "울산대학교"},
+    )
+    assert response.status_code == 502
+    assert response.json()["detail"] == "울산 장소 검색 서버에 연결하지 못했습니다."
 
 
 def test_authentication_is_required() -> None:

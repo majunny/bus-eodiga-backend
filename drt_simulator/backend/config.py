@@ -25,6 +25,8 @@ class BackendSettings(BaseSettings):
     cors_origins: List[str] = Field(default_factory=list)
     osrm_base_url: str = "https://router.project-osrm.org"
     routing_timeout_seconds: float = Field(default=20.0, gt=0.0, le=60.0)
+    nominatim_base_url: str = "https://nominatim.openstreetmap.org"
+    place_search_timeout_seconds: float = Field(default=10.0, gt=0.0, le=30.0)
 
     model_config = SettingsConfigDict(
         env_file=".env",
