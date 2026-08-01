@@ -42,6 +42,15 @@ curl -X POST http://127.0.0.1:8000/api/find_nearest \
 
 기본 라우팅 서버는 `https://router.project-osrm.org`이며 `OSRM_BASE_URL` 환경변수로 자체 OSRM 서버를 지정할 수 있습니다. `ROUTING_TIMEOUT_SECONDS`로 외부 요청 제한 시간을 설정합니다.
 
+## 울산 정류소 API
+
+`backend/data/ulsan_bus_stops_20260522.csv`는 울산광역시가 제공한 `울산광역시_버스 정류소 위치 정보_20260522.CSV`를 UTF-8로 변환한 원본입니다. 전체 행 중 권역이 울산광역시 5개 구·군인 정류소 3,616개를 서버 시작 시 한 번 적재합니다.
+
+- 이름 검색: `GET /v1/bus-stops?query=태화강역&limit=30`
+- 주변 검색: `GET /v1/bus-stops/nearby?latitude=35.53937&longitude=129.35194&radius_m=2000&limit=30`
+
+주변 검색 결과는 직선거리 `distance_m` 오름차순이며, Android는 GPS 위치에서 가장 가까운 실제 정류장을 탑승지로 사용합니다.
+
 ## 호출 예제
 
 ```bash

@@ -3,15 +3,17 @@
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.auth import AuthenticatedUser, get_current_user
+from backend.bus_stops import BusStopService, get_bus_stop_service
 from backend.config import BackendSettings, get_settings
 from backend.firebase import initialize_firestore
 from backend.models import (
     FindNearestRouteRequest,
     FindNearestRouteResponse,
+    BusStopResponse,
     HealthResponse,
     RideRequestCreate,
     RideRequestRecord,
@@ -24,6 +26,7 @@ def create_app(
     settings: Optional[BackendSettings] = None,
     repository: Optional[RideRepository] = None,
     routing_service: Optional[RoutingService] = None,
+    bus_stop_service: Optional[BusStopService] = None,
 ) -> FastAPI:
     """설정과 저장소를 주입할 수 있는 FastAPI 앱을 생성한다."""
 
@@ -41,6 +44,7 @@ def create_app(
         base_url=active_settings.osrm_base_url,
         timeout_seconds=active_settings.routing_timeout_seconds,
     )
+    application.state.bus_stop_service = bus_stop_service or get_bus_stop_service()
 
     if active_settings.cors_origins:
         application.add_middleware(
@@ -70,6 +74,30 @@ def create_app(
             return service.find_nearest(payload)
         except RoutingServiceError as error:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+
+    @application.get("/v1/bus-stops", response_model=list[BusStopResponse])
+    def search_bus_stops(
+        request: Request,
+        query: str = Query(default="", max_length=100),
+        limit: int = Query(default=30, ge=1, le=100),
+    ) -> list[BusStopResponse]:
+        """정류장 이름으로 울산 정류소를 검색한다."""
+
+        service: BusStopService = request.app.state.bus_stop_service
+        return service.search(query=query, limit=limit)
+
+    @application.get("/v1/bus-stops/nearby", response_model=list[BusStopResponse])
+    def nearby_bus_stops(
+        request: Request,
+        latitude: float = Query(ge=-90.0, le=90.0),
+        longitude: float = Query(ge=-180.0, le=180.0),
+        radius_m: float = Query(default=2_000.0, ge=50.0, le=20_000.0),
+        limit: int = Query(default=30, ge=1, le=100),
+    ) -> list[BusStopResponse]:
+        """현재 위치 주변 정류소를 거리순으로 반환한다."""
+
+        service: BusStopService = request.app.state.bus_stop_service
+        return service.nearby(latitude, longitude, radius_m, limit)
 
     @application.post(
         "/v1/ride-requests",

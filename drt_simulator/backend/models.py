@@ -131,3 +131,14 @@ class FindNearestRouteResponse(BaseModel):
     distance_m: float = Field(ge=0.0)
     map_url: str
     route_coords: List[List[float]]
+
+
+class BusStopResponse(BaseModel):
+    """Android에 제공하는 울산 버스 정류소 정보."""
+
+    stop_id: str
+    name: str
+    latitude: float = Field(ge=-90.0, le=90.0)
+    longitude: float = Field(ge=-180.0, le=180.0)
+    district: str
+    distance_m: Optional[float] = Field(default=None, ge=0.0)

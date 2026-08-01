@@ -119,6 +119,23 @@ def test_find_nearest_route_reports_upstream_failure() -> None:
     assert response.json()["detail"] == "경로를 계산할 수 없습니다."
 
 
+def test_bus_stop_search_and_nearby_are_public() -> None:
+    """Android는 인증 없이 정류장 이름과 현재 위치 주변을 조회할 수 있다."""
+
+    client = make_client()
+    search = client.get("/v1/bus-stops", params={"query": "태화강역", "limit": 10})
+    assert search.status_code == 200
+    assert search.json()
+    assert all("태화강역" in stop["name"] for stop in search.json())
+
+    nearby = client.get(
+        "/v1/bus-stops/nearby",
+        params={"latitude": 35.53937, "longitude": 129.35194, "radius_m": 1000},
+    )
+    assert nearby.status_code == 200
+    assert nearby.json()[0]["distance_m"] == 0.0
+
+
 def test_authentication_is_required() -> None:
     """호출 생성에는 Bearer 토큰이 필요하다."""
 
