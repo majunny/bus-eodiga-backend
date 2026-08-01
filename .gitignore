@@ -18,6 +18,8 @@ google-services.json
 .pytest_cache/
 *.zip
 *.log
+drt_simulator/hardware/*.pt
+/26swbest2.pt
 cache/
 outputs/
 map.db

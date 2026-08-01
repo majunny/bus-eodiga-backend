@@ -22,7 +22,6 @@ from pathlib import Path
 
 import cv2
 import httpx
-import modi_plus
 from openai import OpenAI
 from ultralytics import YOLO
 
@@ -34,7 +33,11 @@ KIOSK_API_KEY = os.getenv("BUS_EODIGA_KIOSK_KEY", "")
 KIOSK_DEVICE_ID = os.getenv("BUS_EODIGA_KIOSK_DEVICE_ID", "dongbu-kiosk-01")
 OPENAI_MODEL = os.getenv("OPENAI_VISION_MODEL", "gpt-4o")
 
-MODEL_PATH = Path(os.getenv("YOLO_MODEL_PATH", "26swbest2.pt"))
+DEFAULT_MODEL_PATH = Path(__file__).with_name("26swbest2.pt")
+ROOT_MODEL_PATH = Path(__file__).resolve().parents[2] / "26swbest2.pt"
+if not DEFAULT_MODEL_PATH.is_file() and ROOT_MODEL_PATH.is_file():
+    DEFAULT_MODEL_PATH = ROOT_MODEL_PATH
+MODEL_PATH = Path(os.getenv("YOLO_MODEL_PATH", str(DEFAULT_MODEL_PATH))).expanduser()
 CAMERA_ID = int(os.getenv("CAMERA_ID", "0"))
 LOUD_SOUND_THRESHOLD = 90
 LOUD_SOUND_RESET_THRESHOLD = 60
@@ -123,6 +126,15 @@ def webcam_worker() -> None:
     """카드 인식과 소음 발생 시점의 사진 캡처를 담당한다."""
 
     global current_user_type, is_running
+    if not MODEL_PATH.is_file():
+        print(
+            ">> 카드 인식 모델이 없습니다: "
+            f"{MODEL_PATH}\n"
+            ">> 친구에게 26swbest2.pt를 받아 이 경로에 두거나 "
+            "YOLO_MODEL_PATH 환경변수를 지정하세요."
+        )
+        is_running = False
+        return
     model = YOLO(str(MODEL_PATH))
     camera = cv2.VideoCapture(CAMERA_ID)
     if not camera.isOpened():
@@ -168,6 +180,13 @@ def analysis_worker() -> None:
 
 def main() -> None:
     global current_destination_index, is_running
+
+    try:
+        import modi_plus
+    except ModuleNotFoundError as error:
+        raise RuntimeError(
+            "MODI+ Python SDK(modi_plus)가 없습니다. 키트에서 제공한 SDK를 먼저 설치하세요."
+        ) from error
 
     api = KioskApiClient()
     print("MODI+ 키오스크 모듈 연결 중...")

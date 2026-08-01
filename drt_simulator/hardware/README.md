@@ -6,6 +6,8 @@
 
 `modi_station_kiosk.py`는 웹캠 카드 인식, 조이스틱 목적지 선택, 버튼 호출, 환경 센서 소음 감지와 디스플레이·LED·스피커를 담당합니다. 키오스크의 승차 정류장은 동부아파트입구로 고정되며 나머지 5개 정류장을 목적지로 선택합니다. Firestore에 직접 쓰지 않고 Render API를 호출하므로 Android의 MODI 호출과 같은 `modi-bus-01` 공동 배차열에 참여합니다.
 
+카드 인식에는 친구가 학습한 `26swbest2.pt`가 필요합니다. 기본 위치는 `hardware/26swbest2.pt`이고 현재처럼 저장소 최상단에 둬도 자동으로 찾습니다. 다른 위치를 사용할 때는 `YOLO_MODEL_PATH`를 지정합니다. 확인된 현재 모델에는 `senior_card`, `disabled_card` 클래스가 모두 들어 있습니다.
+
 Render에는 다음 값을 설정합니다.
 
 ```text
@@ -18,6 +20,7 @@ PC에서는 같은 키와 OpenAI 키를 환경변수로 전달합니다. OpenAI 
 ```bash
 export BUS_EODIGA_KIOSK_KEY='Render와 같은 키'
 export OPENAI_API_KEY='사용할 OpenAI 키'
+export YOLO_MODEL_PATH='/친구에게/받은/26swbest2.pt'
 python -m hardware.modi_station_kiosk
 ```
 
