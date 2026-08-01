@@ -1,5 +1,20 @@
 # MODI+ 미니 자동차 백엔드 연결
 
+## 고정 2인 시연(P1 자동 + P2 Android)
+
+친구 파일 없이 먼저 배차 시나리오만 시작할 때는 P1 자동 호출을 한 번 등록합니다.
+
+```bash
+export BUS_EODIGA_KIOSK_KEY='Render의 MODI_KIOSK_API_KEY와 같은 값'
+python -m hardware.start_fixed_modi_p1
+```
+
+P1은 동부아파트입구에서 승차해 공업탑에서 내립니다. 이어서 Android에서 MODI 모드를 선택하고 P2를 `롯데마트`(모형의 롯데백화점 위치)에서 승차, `강남초등학교`에서 하차로 호출합니다. 두 호출이 모이면 서버는 다음 순서로 경유지를 확정합니다.
+
+`동부아파트입구(P1 승차) → 롯데마트(P2 승차) → 강남초등학교(P2 하차) → 공업탑(P1 하차)`
+
+이 고정 시나리오는 총 2개의 호출이 필요합니다. 한 호출의 동반 인원만으로는 출발하지 않습니다.
+
 이 브리지는 Render의 공동 DRT 경유 순서를 받아 친구의 `MODI+ BLE + IMU V4` 자동차가 미니맵에서 같은 순서로 이동하게 합니다. 차량이 보고한 `EN_ROUTE`, `ARRIVED`, `BOARDED`, `DROPPED_OFF`, `COMPLETED` 상태는 Firestore를 통해 Android에 표시됩니다.
 
 ## 동부아파트입구 키오스크

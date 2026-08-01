@@ -223,9 +223,9 @@ def create_app(
             saved.request_id,
             saved.user_id,
             "modi-bus-01",
-            current.demo_group_size,
+            2,
             current.demo_queue_ttl_seconds,
-            current.demo_min_request_count,
+            2,
         )
         if pooled is None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Kiosk request could not join dispatch")
@@ -292,13 +292,14 @@ def create_app(
                     detail="MODI requests may use only the six model stops",
                 )
         vehicle_id = "modi-bus-01" if is_modi_request else "demo-bus-01"
+        dispatch_group_size = 2 if is_modi_request else current.demo_group_size
         record = store.join_demo_pool(
             request_id,
             user.uid,
             vehicle_id,
-            current.demo_group_size,
+            dispatch_group_size,
             current.demo_queue_ttl_seconds,
-            current.demo_min_request_count,
+            2,
         )
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")

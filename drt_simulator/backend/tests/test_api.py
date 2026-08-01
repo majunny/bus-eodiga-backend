@@ -299,7 +299,7 @@ def test_modi_and_general_demo_requests_use_separate_vehicle_queues() -> None:
         headers={"Authorization": "Bearer test-token:modi"},
     )
     assert modi_joined.json()["matched_passenger_count"] == 2
-    assert modi_joined.json()["assigned_vehicle_id"] is None
+    assert modi_joined.json()["assigned_vehicle_id"] == "modi-bus-01"
 
 
 def test_idempotent_create_and_cancel() -> None:

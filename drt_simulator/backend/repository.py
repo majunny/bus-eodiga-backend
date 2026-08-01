@@ -486,6 +486,22 @@ def _build_demo_route_stops(records: list[RideRequestRecord]) -> list:
 def _build_demo_route_plan(records: list[RideRequestRecord]) -> list[dict]:
     """각 경유지를 소유 호출·승하차 종류와 함께 반환한다."""
 
+    # 현재 대회용 MODI 고정 시나리오: P1은 동부아파트에서 승차하고,
+    # P2는 롯데마트에서 승차한 뒤 강남초에서 하차하며, 마지막에
+    # P1이 공업탑에서 하차한다. 일반 DRT는 아래의 경도 정렬을 유지한다.
+    by_pickup = {item.pickup.place_id: item for item in records}
+    by_destination = {item.destination.place_id: item for item in records}
+    fixed_pickups = [by_pickup.get("31208"), by_pickup.get("64201")]
+    fixed_destinations = [by_destination.get("40410"), by_destination.get("40404")]
+    if all(fixed_pickups) and all(fixed_destinations):
+        return [
+            {"request_id": item.request_id, "type": "PICKUP", "order": index + 1, "place": item.pickup}
+            for index, item in enumerate(fixed_pickups)
+        ] + [
+            {"request_id": item.request_id, "type": "DROPOFF", "order": index + 1, "place": item.destination}
+            for index, item in enumerate(fixed_destinations)
+        ]
+
     pickup_order = sorted(records, key=lambda item: item.pickup.location.longitude)
     destination_order = sorted(records, key=lambda item: item.destination.location.longitude)
     return [
