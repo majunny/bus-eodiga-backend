@@ -25,6 +25,10 @@ class RideRepository(ABC):
     def cancel(self, request_id: str, user_id: str) -> Optional[RideRequestRecord]:
         """사용자가 소유한 대기 호출을 취소한다."""
 
+    @abstractmethod
+    def assign_demo(self, request_id: str, user_id: str, vehicle_id: str) -> Optional[RideRequestRecord]:
+        """시연 중 사용자의 대기 호출에 차량을 배정한다."""
+
 
 class MemoryRideRepository(RideRepository):
     """Firebase 없이 로컬 테스트에 사용하는 저장소."""
@@ -60,6 +64,23 @@ class MemoryRideRepository(RideRepository):
             if record.status != RideStatus.WAITING:
                 return record
             updated = record.model_copy(update={"status": RideStatus.CANCELLED, "updated_at": datetime.now(timezone.utc)})
+            self._records[request_id] = updated
+            return updated
+
+    def assign_demo(self, request_id: str, user_id: str, vehicle_id: str) -> Optional[RideRequestRecord]:
+        """WAITING 호출을 ASSIGNED 상태로 변경한다."""
+
+        with self._lock:
+            record = self._records.get(request_id)
+            if record is None or record.user_id != user_id:
+                return None
+            if record.status != RideStatus.WAITING:
+                return record
+            updated = record.model_copy(update={
+                "status": RideStatus.ASSIGNED,
+                "assigned_vehicle_id": vehicle_id,
+                "updated_at": datetime.now(timezone.utc),
+            })
             self._records[request_id] = updated
             return updated
 
@@ -124,5 +145,31 @@ class FirestoreRideRepository(RideRepository):
             return True
 
         if not cancel_in_transaction(transaction):
+            return None
+        return self.get(request_id)
+
+    def assign_demo(self, request_id: str, user_id: str, vehicle_id: str) -> Optional[RideRequestRecord]:
+        """소유권과 WAITING 상태를 확인한 뒤 시연 차량을 배정한다."""
+
+        document = self._collection.document(request_id)
+        transaction = self._client.transaction()
+
+        @firestore.transactional
+        def assign_in_transaction(current: firestore.Transaction) -> bool:
+            snapshot = document.get(transaction=current)
+            if not snapshot.exists:
+                return False
+            data = snapshot.to_dict()
+            if data.get("user_id") != user_id:
+                return False
+            if data.get("status") == RideStatus.WAITING.value:
+                current.update(document, {
+                    "status": RideStatus.ASSIGNED.value,
+                    "assigned_vehicle_id": vehicle_id,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                })
+            return True
+
+        if not assign_in_transaction(transaction):
             return None
         return self.get(request_id)

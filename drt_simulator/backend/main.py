@@ -144,6 +144,23 @@ def create_app(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")
         return record
 
+    @application.post("/v1/ride-requests/{request_id}/demo-assign", response_model=RideRequestRecord)
+    def assign_demo_vehicle(
+        request_id: str,
+        request: Request,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> RideRequestRecord:
+        """대회 시연에서 Firestore 배차 이벤트를 실제로 발생시킨다."""
+
+        current: BackendSettings = request.app.state.settings
+        if not current.enable_demo_dispatch:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo dispatch is disabled")
+        store: RideRepository = request.app.state.ride_repository
+        record = store.assign_demo(request_id, user.uid, "demo-bus-01")
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride request not found")
+        return record
+
     return application
 
 

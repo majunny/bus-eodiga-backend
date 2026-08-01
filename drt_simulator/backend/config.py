@@ -16,6 +16,7 @@ class BackendSettings(BaseSettings):
     firebase_project_id: str = ""
     firebase_credentials_json: str = ""
     allow_dev_auth: bool = False
+    enable_demo_dispatch: bool = False
     dev_auth_token: str = "local-demo-token"
     cors_origins: List[str] = Field(default_factory=list)
     osrm_base_url: str = "https://router.project-osrm.org"

@@ -39,6 +39,7 @@ def make_client(routing_service: object | None = None) -> TestClient:
         allow_dev_auth=True,
         dev_auth_token="test-token",
         store_backend="memory",
+        enable_demo_dispatch=True,
     )
     return TestClient(
         create_app(
@@ -169,3 +170,24 @@ def test_idempotent_create_and_cancel() -> None:
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "CANCELLED"
+
+
+def test_demo_assignment_updates_waiting_request() -> None:
+    """시연 배차는 실제 저장소 상태와 차량 ID를 갱신한다."""
+
+    client = make_client()
+    headers = {
+        "Authorization": "Bearer test-token",
+        "Idempotency-Key": "request-key-demo-assign",
+    }
+    created = client.post("/v1/ride-requests", headers=headers, json=request_payload())
+    request_id = created.json()["request_id"]
+
+    assigned = client.post(
+        "/v1/ride-requests/{}/demo-assign".format(request_id),
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert assigned.status_code == 200
+    assert assigned.json()["status"] == "ASSIGNED"
+    assert assigned.json()["assigned_vehicle_id"] == "demo-bus-01"
